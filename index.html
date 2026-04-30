@@ -41,7 +41,7 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
 /* ---------------- Utilities ---------------- */
 const LS_KEY = 'fbc_state_v1';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const STARTING_CASH = 10000;
 const QUARTER_LABEL = 'Q2 2026';
 const QUARTER_START = '2026-04-01';
@@ -385,10 +385,30 @@ function buildSeed() {
       note: 'seeded'
     });
   });
-  // Compute cash = STARTING_CASH - sum(cost)
+  // Rescale any over-allocated player so total cost == STARTING_CASH (cash >= 0).
+  // The source spreadsheet had rounding-driven over-allocations; we preserve each
+  // player's relative weights but cap their total spend at $10,000.
   Object.values(players).forEach(p => {
     const totalCost = Object.values(p.holdings).reduce((s,h) => s + h.cost, 0);
-    p.cash = STARTING_CASH - totalCost;
+    if (totalCost > STARTING_CASH) {
+      const scale = STARTING_CASH / totalCost;
+      Object.values(p.holdings).forEach(h => {
+        h.units *= scale;
+        h.cost  *= scale;
+      });
+      // Scale the matching seed trades so the chart's trade-replay stays consistent.
+      trades.forEach(tr => {
+        if (tr.player_id === p.id) {
+          tr.units *= scale;
+          tr.value *= scale;
+        }
+      });
+    }
+  });
+  // Cash = STARTING_CASH - sum(cost). After the rescale this is guaranteed >= 0.
+  Object.values(players).forEach(p => {
+    const totalCost = Object.values(p.holdings).reduce((s,h) => s + h.cost, 0);
+    p.cash = Math.max(0, STARTING_CASH - totalCost);
   });
   return {
     schema_version: SCHEMA_VERSION,
@@ -1525,8 +1545,13 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
 
   function quickSet(v) {
     if (action === 'buy') {
-      const cap = Math.min(player.cash, 5000);
-      const presets = [50, 100, 250, Math.max(50, Math.floor(cap))];
+      const cap = Math.max(0, player.cash);
+      const presets = [
+        Math.min(50,  Math.floor(cap)),
+        Math.min(100, Math.floor(cap)),
+        Math.min(250, Math.floor(cap)),
+        Math.floor(cap),
+      ];
       setAmount(String(presets[v]));
     } else {
       // sell: amount in USD
@@ -1602,9 +1627,24 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
           </div>
         )}
 
+        {action === 'buy' && amountNum > player.cash + 0.01 && (
+          <div className="fbc-g-warn">
+            💡 Not enough cash. You have <b>{fmtUSD(player.cash, 2)}</b>{player.cash <= 0 ? '. Sell something you own first to free up cash.' : `. Try a smaller amount, or sell something to free up more cash.`}
+          </div>
+        )}
+        {action === 'sell' && amountNum > ownedValue + 0.01 && (
+          <div className="fbc-g-warn">
+            💡 You only own <b>{fmtUSD(ownedValue, 2)}</b> of {ticker}. Try a smaller amount.
+          </div>
+        )}
+
         <button
           className={`fbc-g-action-btn ${action === 'sell' ? 'sell' : ''}`}
-          disabled={!amountNum}
+          disabled={
+            !amountNum ||
+            (action === 'buy'  && amountNum > player.cash + 0.01) ||
+            (action === 'sell' && amountNum > ownedValue + 0.01)
+          }
           onClick={handleConfirm}
         >
           {action === 'buy' ? 'BUY' : 'SELL'} {ticker}
@@ -1751,6 +1791,9 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
       const next = JSON.parse(JSON.stringify(prev));
       const p = next.players[currentPid];
       if (action === 'buy') {
+        // Defensive: refuse buys that would push cash negative (e.g. price moved
+        // between input and confirm). The TradeSheet already blocks the button.
+        if (value > p.cash + 0.01) return prev;
         p.cash -= value;
         if (!p.holdings[ticker]) p.holdings[ticker] = { units:0, cost:0 };
         p.holdings[ticker].units += units;
