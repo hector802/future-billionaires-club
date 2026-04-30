@@ -1,0 +1,2078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#05070d" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="FBC" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<title>Future Billionaires Club</title>
+<link rel="preconnect" href="https://cdn.tailwindcss.com" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<link rel="stylesheet" href="style.css" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="root">
+  <div style="padding:32px; font-family:ui-sans-serif,system-ui; text-align:center; color:#5d6378;">
+    <div style="font-size:14px; letter-spacing:0.2em; color:#c9a659; font-weight:700;">FUTURE BILLIONAIRES CLUB</div>
+    <div style="margin-top:12px; font-size:13px;">Loading… (first load can take 5–10s while React + Chart.js download)</div>
+    <noscript style="margin-top:16px; display:block; color:#dc2626;">JavaScript is disabled. Enable it to play.</noscript>
+  </div>
+</div>
+<script type="text/babel" data-presets="react">
+/* =========================================================================
+ * FUTURE BILLIONAIRES CLUB — single-file family paper-portfolio game
+ * 4 players, $10,000 starting cash each, quarterly format.
+ * Player names are entered locally and persisted in browser localStorage.
+ * Universe: S&P 500 selection + FTSE 100 selection + 50 Resources + Crypto/Commodities
+ * Bloomberg-style landing dashboard → kid-friendly game
+ * Live prices via Yahoo Finance through CORS proxy chain
+ * ========================================================================= */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ---------------- Utilities ---------------- */
+const LS_KEY = 'fbc_state_v1';
+const SCHEMA_VERSION = 2;
+const STARTING_CASH = 10000;
+const QUARTER_LABEL = 'Q2 2026';
+const QUARTER_START = '2026-04-01';
+const QUARTER_END   = '2026-06-30';
+
+const fmtUSD  = (n,d=2) => '$' + (n??0).toLocaleString('en-US',{minimumFractionDigits:d, maximumFractionDigits:d});
+const fmtUSD0 = (n)     => '$' + Math.round(n??0).toLocaleString('en-US');
+const fmtPct  = (n,d=2) => (n>=0?'+':'') + (n??0).toFixed(d) + '%';
+const fmtUnits= (n)     => n.toLocaleString('en-US',{maximumFractionDigits:6});
+const todayISO= ()      => new Date().toISOString().slice(0,10);
+const nowISO  = ()      => new Date().toISOString();
+const uid     = (p)     => `${p}_${Math.random().toString(36).slice(2,9)}`;
+const randn   = ()      => { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+
+/* ---------------- Universe ----------------
+ * Each: t=ticker n=name e=emoji b=bucket s=sector p=basePrice (USD-equivalent)
+ * Buckets: us=S&P500, uk=FTSE100, res=Resources, oth=Crypto/Commodities
+ * NOTE: prices are *simulated starting points* only. Real-time data is a v1.5 swap-in.
+ * ----------------------------------------- */
+const UNIVERSE = [
+  // === US STOCKS (S&P 500 selection) ===
+  {t:'AAPL',n:'Apple',e:'🍎',b:'us',s:'Big Tech',p:215},
+  {t:'MSFT',n:'Microsoft',e:'🪟',b:'us',s:'Big Tech',p:425},
+  {t:'GOOGL',n:'Alphabet (Google)',e:'🔍',b:'us',s:'Big Tech',p:312.5},
+  {t:'AMZN',n:'Amazon',e:'📦',b:'us',s:'Big Tech',p:185},
+  {t:'META',n:'Meta (Facebook)',e:'👍',b:'us',s:'Big Tech',p:520},
+  {t:'NVDA',n:'NVIDIA',e:'🧠',b:'us',s:'Big Tech',p:188.24},
+  {t:'TSLA',n:'Tesla',e:'🚗',b:'us',s:'Cars',p:364},
+  {t:'BRK.B',n:'Berkshire Hathaway',e:'🎩',b:'us',s:'Holding',p:445},
+  {t:'AVGO',n:'Broadcom',e:'🔌',b:'us',s:'Big Tech',p:1500},
+  {t:'JPM',n:'JPMorgan Chase',e:'🏦',b:'us',s:'Bank',p:308.11},
+  {t:'V',n:'Visa',e:'💳',b:'us',s:'Payments',p:280},
+  {t:'WMT',n:'Walmart',e:'🛒',b:'us',s:'Retail',p:88},
+  {t:'MA',n:'Mastercard',e:'💳',b:'us',s:'Payments',p:475},
+  {t:'JNJ',n:'Johnson & Johnson',e:'💊',b:'us',s:'Health',p:160},
+  {t:'PG',n:'Procter & Gamble',e:'🧴',b:'us',s:'Consumer',p:170},
+  {t:'ORCL',n:'Oracle',e:'🗄️',b:'us',s:'Big Tech',p:160},
+  {t:'HD',n:'Home Depot',e:'🔨',b:'us',s:'Retail',p:380},
+  {t:'COST',n:'Costco',e:'🥫',b:'us',s:'Retail',p:880},
+  {t:'BAC',n:'Bank of America',e:'🏦',b:'us',s:'Bank',p:42},
+  {t:'KO',n:'Coca-Cola',e:'🥤',b:'us',s:'Consumer',p:64},
+  {t:'PEP',n:'PepsiCo',e:'🥤',b:'us',s:'Consumer',p:160},
+  {t:'ADBE',n:'Adobe',e:'🎨',b:'us',s:'Big Tech',p:520},
+  {t:'CSCO',n:'Cisco',e:'📡',b:'us',s:'Big Tech',p:50},
+  {t:'CRM',n:'Salesforce',e:'☁️',b:'us',s:'Big Tech',p:280},
+  {t:'NFLX',n:'Netflix',e:'🎬',b:'us',s:'Media',p:680},
+  {t:'AMD',n:'AMD',e:'⚙️',b:'us',s:'Big Tech',p:165},
+  {t:'MCD',n:'McDonald’s',e:'🍔',b:'us',s:'Restaurants',p:295},
+  {t:'DIS',n:'Disney',e:'🐭',b:'us',s:'Media',p:97},
+  {t:'IBM',n:'IBM',e:'💻',b:'us',s:'Big Tech',p:230},
+  {t:'CAT',n:'Caterpillar',e:'🏗️',b:'us',s:'Industrials',p:765},
+  {t:'GE',n:'General Electric',e:'🔧',b:'us',s:'Industrials',p:200},
+  {t:'PFE',n:'Pfizer',e:'💉',b:'us',s:'Health',p:28},
+  {t:'NKE',n:'Nike',e:'👟',b:'us',s:'Consumer',p:70},
+  {t:'BA',n:'Boeing',e:'✈️',b:'us',s:'Industrials',p:175},
+  {t:'GS',n:'Goldman Sachs',e:'🏦',b:'us',s:'Bank',p:894.74},
+  {t:'MS',n:'Morgan Stanley',e:'🏦',b:'us',s:'Bank',p:130},
+  {t:'AXP',n:'American Express',e:'💳',b:'us',s:'Payments',p:295},
+  {t:'WFC',n:'Wells Fargo',e:'🏦',b:'us',s:'Bank',p:75},
+  {t:'F',n:'Ford',e:'🚙',b:'us',s:'Cars',p:11},
+  {t:'GM',n:'General Motors',e:'🚙',b:'us',s:'Cars',p:55},
+  {t:'COIN',n:'Coinbase',e:'🪙',b:'us',s:'Crypto Co',p:188.5},
+  {t:'EL',n:'Estee Lauder',e:'💄',b:'us',s:'Consumer',p:72.89},
+  {t:'DE',n:'Deere & Co',e:'🚜',b:'us',s:'Industrials',p:594.18},
+  {t:'PYPL',n:'PayPal',e:'💸',b:'us',s:'Payments',p:75},
+  {t:'SBUX',n:'Starbucks',e:'☕',b:'us',s:'Restaurants',p:95},
+  {t:'UBER',n:'Uber',e:'🚖',b:'us',s:'Tech',p:80},
+  {t:'TGT',n:'Target',e:'🎯',b:'us',s:'Retail',p:135},
+  {t:'COP',n:'ConocoPhillips',e:'🛢️',b:'us',s:'Energy',p:108},
+  {t:'XOM',n:'ExxonMobil',e:'🛢️',b:'us',s:'Energy',p:118},
+  {t:'CVX',n:'Chevron',e:'⛽',b:'us',s:'Energy',p:155},
+  {t:'BLSH',n:'Bullish (CoinDesk)',e:'🟢',b:'us',s:'Crypto Co',p:39.75},
+  {t:'TTM',n:'Tata Motors (ADR)',e:'🚛',b:'us',s:'Cars',p:413.4},
+  {t:'SOXL',n:'Direxion Semi 3x ETF',e:'⚡',b:'us',s:'Sector ETF',p:66.51},
+  {t:'AMPX',n:'Amprius Technologies',e:'🔋',b:'us',s:'Battery',p:18},
+
+  // === UK STOCKS (FTSE 100 selection — prices in USD-equivalent for game; live mode handles FX) ===
+  {t:'HSBA.L',n:'HSBC',e:'🏦',b:'uk',s:'Bank',p:11},
+  {t:'BP.L',n:'BP',e:'🛢️',b:'uk',s:'Energy',p:5.2},
+  {t:'SHEL.L',n:'Shell',e:'🐚',b:'uk',s:'Energy',p:34},
+  {t:'AZN.L',n:'AstraZeneca',e:'💊',b:'uk',s:'Health',p:140},
+  {t:'GSK.L',n:'GSK',e:'💊',b:'uk',s:'Health',p:18},
+  {t:'ULVR.L',n:'Unilever',e:'🧴',b:'uk',s:'Consumer',p:60},
+  {t:'RIO.L',n:'Rio Tinto',e:'⛏️',b:'uk',s:'Mining',p:67},
+  {t:'AAL.L',n:'Anglo American',e:'⛏️',b:'uk',s:'Mining',p:3047},
+  {t:'GLEN.L',n:'Glencore',e:'⛏️',b:'uk',s:'Mining',p:5.1},
+  {t:'LLOY.L',n:'Lloyds Banking',e:'🏦',b:'uk',s:'Bank',p:0.78},
+  {t:'BARC.L',n:'Barclays',e:'🏦',b:'uk',s:'Bank',p:3.4},
+  {t:'NWG.L',n:'NatWest',e:'🏦',b:'uk',s:'Bank',p:5.0},
+  {t:'VOD.L',n:'Vodafone',e:'📱',b:'uk',s:'Telecom',p:0.95},
+  {t:'BT-A.L',n:'BT Group',e:'📞',b:'uk',s:'Telecom',p:1.95},
+  {t:'BATS.L',n:'British American Tobacco',e:'🚬',b:'uk',s:'Consumer',p:38},
+  {t:'DGE.L',n:'Diageo',e:'🥃',b:'uk',s:'Consumer',p:33},
+  {t:'REL.L',n:'RELX',e:'📰',b:'uk',s:'Information',p:48},
+  {t:'RR.L',n:'Rolls-Royce',e:'✈️',b:'uk',s:'Industrials',p:9.5},
+  {t:'PRU.L',n:'Prudential',e:'🛡️',b:'uk',s:'Insurance',p:11},
+  {t:'BA.L',n:'BAE Systems',e:'🛡️',b:'uk',s:'Defence',p:22},
+  {t:'TSCO.L',n:'Tesco',e:'🛒',b:'uk',s:'Retail',p:5.0},
+  {t:'NXT.L',n:'Next',e:'👗',b:'uk',s:'Retail',p:130},
+  {t:'BRBY.L',n:'Burberry',e:'🧥',b:'uk',s:'Luxury',p:12},
+  {t:'IHG.L',n:'InterContinental Hotels',e:'🏨',b:'uk',s:'Travel',p:115},
+  {t:'OCDO.L',n:'Ocado',e:'🛒',b:'uk',s:'Retail',p:4.8},
+
+  // === RESOURCES (50 globally — mining, energy, juniors) ===
+  // Diversified mining majors
+  {t:'BHP',n:'BHP Group (ADR)',e:'⛏️',b:'res',s:'Diversified Mining',p:55},
+  {t:'RIO',n:'Rio Tinto (ADR)',e:'⛏️',b:'res',s:'Diversified Mining',p:65},
+  {t:'VALE',n:'Vale',e:'⛏️',b:'res',s:'Iron Ore',p:11},
+  {t:'TECK',n:'Teck Resources',e:'⛏️',b:'res',s:'Diversified Mining',p:50},
+  {t:'FCX',n:'Freeport-McMoRan',e:'🟠',b:'res',s:'Copper',p:48},
+  {t:'SCCO',n:'Southern Copper',e:'🟠',b:'res',s:'Copper',p:115},
+  {t:'FM.TO',n:'First Quantum Minerals',e:'🟠',b:'res',s:'Copper',p:18},
+  {t:'IVN.TO',n:'Ivanhoe Mines',e:'🟠',b:'res',s:'Copper',p:14},
+  {t:'LUN.TO',n:'Lundin Mining',e:'🟠',b:'res',s:'Copper',p:13},
+  {t:'S32.AX',n:'South32',e:'⛏️',b:'res',s:'Diversified Mining',p:2.4},
+  // Gold majors
+  {t:'NEM',n:'Newmont',e:'🥇',b:'res',s:'Gold',p:48},
+  {t:'GOLDM',n:'Barrick Gold',e:'🥇',b:'res',s:'Gold',p:21},
+  {t:'AEM',n:'Agnico Eagle',e:'🥇',b:'res',s:'Gold',p:90},
+  {t:'GFI',n:'Gold Fields',e:'🥇',b:'res',s:'Gold',p:18},
+  {t:'AU',n:'AngloGold Ashanti',e:'🥇',b:'res',s:'Gold',p:35},
+  {t:'KGC',n:'Kinross Gold',e:'🥇',b:'res',s:'Gold',p:11},
+  {t:'PAAS',n:'Pan American Silver',e:'🥈',b:'res',s:'Silver',p:25},
+  {t:'WPM',n:'Wheaton Precious Metals',e:'🥇',b:'res',s:'Royalty',p:65},
+  {t:'FNV',n:'Franco-Nevada',e:'🥇',b:'res',s:'Royalty',p:140},
+  {t:'RGLD',n:'Royal Gold',e:'🥇',b:'res',s:'Royalty',p:155},
+  // Iron ore
+  {t:'FMG.AX',n:'Fortescue Metals',e:'⛏️',b:'res',s:'Iron Ore',p:14},
+  // Lithium / battery
+  {t:'ALB',n:'Albemarle',e:'🔋',b:'res',s:'Lithium',p:90},
+  {t:'PLS.AX',n:'Pilbara Minerals',e:'🔋',b:'res',s:'Lithium',p:1.9},
+  {t:'SQM',n:'SQM',e:'🔋',b:'res',s:'Lithium',p:42},
+  {t:'SGML',n:'Sigma Lithium',e:'🔋',b:'res',s:'Lithium',p:9},
+  // Uranium
+  {t:'CCJ',n:'Cameco',e:'☢️',b:'res',s:'Uranium',p:161.5},
+  {t:'NXE',n:'NexGen Energy',e:'☢️',b:'res',s:'Uranium',p:8},
+  {t:'DNN',n:'Denison Mines',e:'☢️',b:'res',s:'Uranium',p:2.5},
+  {t:'URA',n:'URA Uranium ETF',e:'☢️',b:'res',s:'Uranium',p:35},
+  // Oil majors (extra)
+  {t:'TTE',n:'TotalEnergies',e:'⛽',b:'res',s:'Energy',p:65},
+  {t:'EQNR',n:'Equinor',e:'⛽',b:'res',s:'Energy',p:25},
+  {t:'EOG',n:'EOG Resources',e:'🛢️',b:'res',s:'Energy',p:130},
+  {t:'OXY',n:'Occidental Petroleum',e:'🛢️',b:'res',s:'Energy',p:55},
+  {t:'SLB',n:'Schlumberger',e:'🔧',b:'res',s:'Oilfield Services',p:42},
+  // Steel / coal
+  {t:'MT',n:'ArcelorMittal',e:'🏭',b:'res',s:'Steel',p:32},
+  {t:'BTU',n:'Peabody Energy',e:'🪨',b:'res',s:'Coal',p:18},
+  // Royalty/streaming
+  {t:'SAND',n:'Sandstorm Gold',e:'🥇',b:'res',s:'Royalty',p:7},
+  {t:'TFPM',n:'Triple Flag',e:'🥇',b:'res',s:'Royalty',p:18},
+  // London-listed resources (FTSE-resident, also in res bucket for findability)
+  {t:'ANTO.L',n:'Antofagasta',e:'🟠',b:'res',s:'Copper (UK)',p:21},
+  {t:'FRES.L',n:'Fresnillo',e:'🥈',b:'res',s:'Silver (UK)',p:7},
+  // Junior / spec — the seed spreadsheet picks
+  {t:'THX',n:'Thor Explorations',e:'🥇',b:'res',s:'Gold (Junior)',p:1.30},
+  {t:'DTR',n:'Dateline Resources',e:'⛏️',b:'res',s:'Gold/REE (Junior)',p:0.258},
+  {t:'SRL',n:'Sunrise Energy Metals',e:'🔋',b:'res',s:'Battery Metals (Junior)',p:5.26},
+  {t:'FRS',n:'Forrestania Resources',e:'🥇',b:'res',s:'Gold (Junior)',p:0.5},
+  {t:'PSC',n:'Prospect Resources',e:'🔋',b:'res',s:'Lithium (Junior)',p:0.183},
+  {t:'PGDC',n:'Patagonia Gold',e:'🥇',b:'res',s:'Gold (Junior)',p:0.565},
+  // Uranium pure-plays (extras for findability)
+  {t:'PDN.AX',n:'Paladin Energy',e:'☢️',b:'res',s:'Uranium',p:8},
+  {t:'BHP.L',n:'BHP (London listing)',e:'⛏️',b:'res',s:'Diversified Mining',p:30},
+  {t:'KGH.WA',n:'KGHM',e:'🟠',b:'res',s:'Copper',p:35},
+
+  // === CRYPTO & COMMODITIES ===
+  {t:'BTC',n:'Bitcoin',e:'🟠',b:'oth',s:'Crypto',p:69352.91},
+  {t:'ETH',n:'Ethereum',e:'⛓️',b:'oth',s:'Crypto',p:2115.2},
+  {t:'SOL',n:'Solana',e:'🌞',b:'oth',s:'Crypto',p:47.43},
+  {t:'SOLT',n:'Solana 2x ETF (SOLT)',e:'🌞',b:'oth',s:'Crypto ETF',p:8.43},
+  {t:'GOLD',n:'Gold (per oz)',e:'🥇',b:'oth',s:'Commodity',p:4778.9},
+  {t:'SILVER',n:'Silver (per oz)',e:'🥈',b:'oth',s:'Commodity',p:76.09},
+  {t:'OIL',n:'Crude Oil (per bbl)',e:'🛢️',b:'oth',s:'Commodity',p:78.4},
+];
+
+const BUCKET_LABELS = { us:'S&P 500 (US)', uk:'FTSE 100 (UK)', res:'Resources', oth:'Crypto & Commodities' };
+const BUCKET_ORDER = ['us','uk','res','oth'];
+
+// Famous-names shortlist with hand-written kid-friendly blurbs
+const BLURBS = {
+  AAPL:  'Makes the iPhone, iPad, Mac and Apple Watch. One of the most valuable companies in the world.',
+  MSFT:  'Makes Windows, Xbox, Office and Azure cloud. A huge AI player too.',
+  GOOGL: 'Owns Google Search, YouTube and Android. Most of its money comes from ads.',
+  AMZN:  'The biggest online shop in the world. Also runs huge cloud computers.',
+  META:  'Owns Facebook, Instagram, WhatsApp and the Quest VR headset.',
+  NVDA:  'Makes the chips that power video games and almost every AI in the world.',
+  TSLA:  'Makes electric cars, big batteries, and is trying to build robots.',
+  NFLX:  'Streams films and TV shows to almost every country in the world.',
+  DIS:   'Owns Disney movies, Pixar, Marvel, Star Wars and the theme parks.',
+  MCD:   'The biggest fast-food chain on Earth. Sells Big Macs and Happy Meals.',
+  KO:    'Makes Coca-Cola and many other drinks. Sells in nearly every country.',
+  NKE:   'Makes trainers and sportswear. Sponsors lots of famous athletes.',
+  SBUX:  'A coffee shop you find on every high street. Started in Seattle.',
+  V:     'Powers most of the world’s credit and debit card payments.',
+  JPM:   'A giant US bank. Helps companies, governments and rich families with money.',
+  GS:    'A famous investment bank in New York. Trades stocks and advises companies.',
+  BAC:   'One of the biggest US banks for everyday people.',
+  COIN:  'A place where people buy and sell crypto like Bitcoin.',
+  PYPL:  'Lets you pay for things online without showing your card details.',
+  WMT:   'Massive American supermarket chain. Owns ASDA in the UK.',
+  HD:    'Huge American shop for tools, building materials and DIY.',
+  COST:  'Members-only warehouse store with very big packs of things.',
+  EL:    'Makes makeup and skincare brands like Clinique, MAC and La Mer.',
+  F:     'Ford. Makes cars, pickup trucks and the Mustang.',
+  GM:    'General Motors. Makes Chevrolet, Cadillac and GMC trucks.',
+  TTM:   'Tata Motors. Indian car maker. Owns Jaguar and Land Rover.',
+  CAT:   'Makes the giant yellow diggers, dumper trucks and bulldozers.',
+  DE:    'John Deere. Makes the green tractors and farm machinery.',
+  BA:    'Boeing. Makes big aeroplanes — competes with Airbus.',
+  XOM:   'ExxonMobil. One of the biggest oil and gas companies in the world.',
+  CVX:   'Chevron. American oil major.',
+  COP:   'ConocoPhillips. American oil and gas company.',
+  AVGO:  'Broadcom. Makes chips for phones, networks and cloud computers.',
+  AMD:   'Makes processor chips that compete with Intel and Nvidia.',
+  ADBE:  'Adobe. Makes Photoshop, Illustrator, Premiere and PDF.',
+  CRM:   'Salesforce. Software companies use it to keep track of customers.',
+  ORCL:  'Oracle. Big database and cloud company.',
+  IBM:   'Old-school computer giant. Now mostly cloud and AI services.',
+  CSCO:  'Cisco. Makes the routers and switches that run the internet.',
+  PG:    'Procter & Gamble. Makes Pampers, Gillette, Tide and many more.',
+  PEP:   'PepsiCo. Owns Pepsi, Lay’s crisps, Doritos and Quaker.',
+  JNJ:   'Johnson & Johnson. Big medicine and healthcare company.',
+  PFE:   'Pfizer. Makes lots of medicines and vaccines.',
+  UBER:  'The taxi app. Also delivers food (Uber Eats).',
+  TGT:   'Target. American supermarket / department store.',
+  // UK
+  'HSBA.L': 'HSBC. One of the biggest banks in the world. London-listed but huge in Asia.',
+  'BP.L':   'BP. Big British oil and gas company.',
+  'SHEL.L': 'Shell. British-Dutch oil and gas major.',
+  'AZN.L':  'AstraZeneca. Big British medicine and vaccine company.',
+  'ULVR.L': 'Unilever. Owns Marmite, Dove, Magnum, Hellmann’s and many more.',
+  'RIO.L':  'Rio Tinto. One of the biggest mining companies in the world.',
+  'AAL.L':  'Anglo American. UK-listed mining company that digs for copper, iron ore and more.',
+  'GLEN.L': 'Glencore. Trades and mines metals and energy. Based in Switzerland, listed in London.',
+  'BARC.L': 'Barclays. British bank with the high-street branches and the Wimbledon sponsorship.',
+  'TSCO.L': 'Tesco. The biggest supermarket in the UK.',
+  'BRBY.L': 'Burberry. British luxury fashion. The check pattern.',
+  'IHG.L':  'InterContinental Hotels. Owns Holiday Inn and Crowne Plaza.',
+  'RR.L':   'Rolls-Royce. Makes the giant jet engines on aeroplanes (not the cars).',
+  // Resources juniors
+  THX:  'Thor Explorations. Small gold miner with the Segilola mine in Nigeria.',
+  DTR:  'Dateline Resources. Australian junior with a gold + rare earths project in California.',
+  SRL:  'Sunrise Energy Metals. Australian battery-metals project in New South Wales.',
+  FRS:  'Forrestania Resources. Australian gold explorer in Western Australia.',
+  PSC:  'Prospect Resources. Lithium and copper projects in Africa.',
+  PGDC: 'Patagonia Gold. Gold mining in Argentina.',
+  CCJ:  'Cameco. Canadian uranium giant — the fuel that powers nuclear reactors.',
+  AMPX: 'Amprius. Makes very-high-energy-density batteries for drones and aircraft.',
+  // Resources majors
+  BHP:  'BHP. The biggest mining company in the world. Iron ore, copper, coal.',
+  NEM:  'Newmont. The biggest gold miner in the world.',
+  GOLDM:'Barrick Gold. One of the biggest gold miners — runs mines in many countries.',
+  ALB:  'Albemarle. World leader in lithium for electric-car batteries.',
+  // Crypto / Commodities
+  BTC:  'Bitcoin. The first and biggest cryptocurrency. There will only ever be 21 million.',
+  ETH:  'Ethereum. The second-biggest cryptocurrency. Lets you build apps on top of it.',
+  SOL:  'Solana. A fast, cheap blockchain. Used for crypto trading and games.',
+  SOLT: 'A fund that goes up and down twice as much as Solana. Risky.',
+  GOLD: 'Real gold. People have used it as money for thousands of years.',
+  SILVER:'Real silver. Used in money, jewellery, solar panels and electronics.',
+  OIL:  'Crude oil. Turned into petrol, diesel and plastic. Moves with global demand.',
+  SOXL: 'Tracks semiconductor stocks but moves THREE times as much. High risk, high reward.',
+  BLSH: 'Bullish (CoinDesk). Crypto exchange and the company that owns CoinDesk news.',
+  PAAS: 'Pan American Silver. Big silver and gold miner across the Americas.',
+  WPM:  'Wheaton Precious Metals. Doesn’t mine — it pays miners up front for a slice of future production.',
+  FNV:  'Franco-Nevada. Same idea as Wheaton — a "royalty" company on gold and oil.',
+};
+
+const ASSETS = Object.fromEntries(UNIVERSE.map(a => [a.t, a]));
+
+/* ---------------- Seeded state from the seed spreadsheet ----------------
+ * Each player started Q2 2026 with $10,000 USD. Spreadsheet provides buy
+ * price and shares for each holding; cost basis = buy * shares.
+ * cash = STARTING_CASH - sum(cost). Can be slightly negative for players
+ * who over-allocated (data-entry rounding in the spreadsheet — operator to verify).
+ * ----------------------------------------- */
+function buildSeed() {
+  const players = {
+    p1: { id:'p1', name:'Player 1', short:'P1', emoji:'🦄', color:'#e91e63', cash:0, holdings:{} },
+    p2: { id:'p2', name:'Player 2', short:'P2', emoji:'🐉', color:'#2196f3', cash:0, holdings:{} },
+    p3: { id:'p3', name:'Player 3', short:'P3', emoji:'🦊', color:'#4caf50', cash:0, holdings:{} },
+    p4: { id:'p4', name:'Player 4', short:'P4', emoji:'🌸', color:'#ff9800', cash:0, holdings:{} },
+  };
+  // Seed holdings: [playerId, ticker, buyPrice, shares]
+  const seedTrades = [
+    ['p1','SOL',     47.43,    18.553658],
+    ['p1','TSLA',    364,      2.417582],
+    ['p1','JPM',     308.11,   2.856123],
+    ['p1','EL',      72.89,    12.072987],
+    ['p1','COIN',    188.5,    4.668435],
+    ['p1','BLSH',    39.75,    22.138365],
+    ['p1','ETH',     2115.2,   0.416036],
+    ['p1','BTC',     69352.91, 0.012689],
+    ['p1','GOLD',    4778.9,   0.31388],
+    ['p1','SOXL',    65.93,    23.228966],
+    ['p2','SOLT',    8.43,     118.623962],
+    ['p2','GOOGL',   312.5,    3.2],
+    ['p2','NVDA',    188.24,   5.312367],
+    ['p2','THX',     1.30,     769.230769],
+    ['p2','JPM',     324.81,   3.078723],
+    ['p2','GS',      894.74,   1.117643],
+    ['p2','BTC',     95384.56, 0.010484],
+    ['p2','AAL.L',   3047,     0.328192],
+    ['p2','GOLD',    4411.7,   0.226670],
+    ['p2','SILVER',  76.09,    13.142331],
+    ['p3','DE',      594.18,   1.682992],
+    ['p3','TTM',     413.4,    2.418965],
+    ['p3','NVDA',    184.51,   5.419760],
+    ['p3','CAT',     765,      1.307190],
+    ['p3','SOXL',    66.51,    48.113066],
+    ['p3','AMPX',    18,       177.777778],
+    ['p4','DTR',     0.258,    3414.410223],
+    ['p4','CCJ',     161.5,    5.454600],
+    ['p4','SRL',     5.26,     167.474874],
+    ['p4','FRS',     0.5,      1761.835675],
+    ['p4','PSC',     0.183,    4813.758675],
+    ['p4','PGDC',    0.565,    1559.146615],
+    ['p4','GOLD',    4778.9,   0.31388],
+    ['p4','SILVER',  66.51,    30.070666],
+    ['p4','AMPX',    18,       111.111111],
+  ];
+  const trades = [];
+  const startTs = QUARTER_START + 'T09:30:00Z';
+  seedTrades.forEach(([pid, t, price, units], i) => {
+    if (!ASSETS[t]) console.warn('Seed ticker not in universe:', t);
+    const cost = price * units;
+    if (!players[pid].holdings[t]) {
+      players[pid].holdings[t] = { units:0, cost:0 };
+    }
+    players[pid].holdings[t].units += units;
+    players[pid].holdings[t].cost  += cost;
+    trades.push({
+      id: `t_seed_${i}`,
+      player_id: pid,
+      ts: startTs,
+      action: 'buy',
+      ticker: t,
+      units,
+      price,
+      value: cost,
+      note: 'seeded'
+    });
+  });
+  // Compute cash = STARTING_CASH - sum(cost)
+  Object.values(players).forEach(p => {
+    const totalCost = Object.values(p.holdings).reduce((s,h) => s + h.cost, 0);
+    p.cash = STARTING_CASH - totalCost;
+  });
+  return {
+    schema_version: SCHEMA_VERSION,
+    game: { quarter:QUARTER_LABEL, start:QUARTER_START, end:QUARTER_END, currency:'USD', starting_cash:STARTING_CASH },
+    players,
+    order: ['p1','p2','p3','p4'],
+    trades,
+    created_at: nowISO(),
+    last_modified: nowISO(),
+  };
+}
+const SEED = buildSeed();
+
+/* ---------------- Persistence ---------------- */
+const PRICES_LS_KEY = 'fbc_prices_v1';
+const HIST_LS_KEY   = 'fbc_hist_v1';
+
+function saveLocal(s) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (s && s.schema_version === SCHEMA_VERSION) return s;
+  } catch {}
+  return null;
+}
+function savePricesLocal(prices, fetchedAt) {
+  try { localStorage.setItem(PRICES_LS_KEY, JSON.stringify({ prices, fetchedAt })); } catch {}
+}
+function loadPricesLocal() {
+  try {
+    const raw = localStorage.getItem(PRICES_LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function saveHistLocal(bars, fetchedAt) {
+  try { localStorage.setItem(HIST_LS_KEY, JSON.stringify({ bars, fetchedAt })); } catch {}
+}
+function loadHistLocal() {
+  try {
+    const raw = localStorage.getItem(HIST_LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function exportToFile(state) {
+  const payload = { app:'Future Billionaires Club', schema_version:SCHEMA_VERSION, exported_at:nowISO(), state };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fbc-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function importFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const state = data.state || data;
+        if (!state.players || !state.order) { reject(new Error('Not a Future Billionaires Club save file.')); return; }
+        resolve(state);
+      } catch (e) { reject(e); }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+/* ---------------- Price Simulator ----------------
+ * Each ticker has: cur (current), sessionOpen (start-of-session reference),
+ * dayOpen (used for daily change), prevTickAt (timestamp).
+ * On each tick we drift cur by a normal random walk with mean reversion
+ * to dayOpen. ~30 random tickers updated per tick to feel "alive".
+ * dailyChange % is computed against dayOpen.
+ * ----------------------------------------- */
+function initPrices() {
+  const out = {};
+  UNIVERSE.forEach(a => {
+    // Give each name a mild starting daily change for first impression
+    const startChgPct = (Math.random() - 0.5) * 4; // -2% to +2%
+    const dayOpen = a.p / (1 + startChgPct/100);
+    out[a.t] = {
+      cur: a.p,
+      dayOpen,
+      sessionOpen: a.p,
+      prevTickAt: Date.now(),
+      lastTickDir: 0,
+    };
+  });
+  return out;
+}
+
+// Override base prices for tickers that appear in the seeded portfolio,
+// so initial P&L is exactly 0 at game start (matches the seed spreadsheet intent).
+function applySeedToPrices(prices, seed) {
+  Object.values(seed.players).forEach(p => {
+    Object.entries(p.holdings).forEach(([t, h]) => {
+      if (prices[t]) {
+        // Pick the most-recent buy price for this ticker if multiple players hold it
+        const tradesForT = seed.trades.filter(tr => tr.ticker === t);
+        if (tradesForT.length) {
+          const avgBuy = tradesForT.reduce((s,tr) => s + tr.price * tr.units, 0) /
+                         tradesForT.reduce((s,tr) => s + tr.units, 0);
+          // For first-load realism, set current = avg buy (P&L starts at 0 there)
+          // and dayOpen slightly different so the dashboard has a non-zero daily change
+          prices[t].cur = avgBuy;
+          prices[t].sessionOpen = avgBuy;
+          const startChgPct = (Math.random() - 0.5) * 4;
+          prices[t].dayOpen = avgBuy / (1 + startChgPct/100);
+        }
+      }
+    });
+  });
+  return prices;
+}
+
+// Tickers with a fresh live price (within LIVE_FRESH_MS) get a much milder
+// drift — purely cosmetic so the dashboard tile flashes — but the price stays
+// anchored to the live value. Stale tickers drift more freely.
+const LIVE_FRESH_MS = 90_000;
+function priceTick(prices) {
+  const next = { ...prices };
+  const tickers = Object.keys(next);
+  const updateCount = Math.max(8, Math.floor(tickers.length * 0.18));
+  const now = Date.now();
+  for (let i = 0; i < updateCount; i++) {
+    const t = tickers[Math.floor(Math.random() * tickers.length)];
+    const p = next[t];
+    if (!p) continue;
+    const isLiveFresh = p.liveAt && (now - p.liveAt) < LIVE_FRESH_MS;
+    // For live-fresh tickers: tiny cosmetic drift only (±0.05% sd, no mean reversion to a stale dayOpen)
+    // For simulated tickers: full random walk + mean reversion
+    const drift     = isLiveFresh ? randn() * 0.0005           : randn() * 0.0025;
+    const reversion = isLiveFresh ? 0                          : (p.dayOpen - p.cur) / p.dayOpen * 0.02;
+    const occasional= isLiveFresh ? 0                          : (Math.random() < 0.04 ? randn() * 0.005 : 0);
+    const pctChange = drift + reversion + occasional;
+    const newCur = Math.max(0.0001, p.cur * (1 + pctChange));
+    next[t] = {
+      ...p,
+      cur: newCur,
+      lastTickDir: newCur > p.cur ? 1 : (newCur < p.cur ? -1 : 0),
+      prevTickAt: now,
+    };
+  }
+  return next;
+}
+
+function dailyChangePct(p) {
+  if (!p || !p.dayOpen) return 0;
+  return (p.cur - p.dayOpen) / p.dayOpen * 100;
+}
+
+/* ---------------- LIVE DATA LAYER (Yahoo via CORS proxy chain) ----------------
+ * Inherited from Reggie's v7.2 codebase (response shape: json.spark.result[]).
+ * Refreshes ~every 60s. Between fetches the simulator keeps the dashboard alive.
+ * FX: GBPUSD / AUDUSD / CADUSD fetched alongside; UK/AU/CA listings converted to USD.
+ * Currency = "GBp" (London pence) divided by 100 before FX.
+ * Failure mode: if all proxies fail, dataMode falls back to 'sim' and the
+ * dashboard says so — buy/sell still works against the simulated feed.
+ * --------------------------------------------------------------------------- */
+
+// Map our internal ticker → Yahoo symbol. null = not live-fetchable, stays simulated.
+const YAHOO_SYMBOLS = (() => {
+  const m = {};
+  // US stocks — internal ticker is Yahoo symbol with one exception
+  ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA','AVGO','JPM','V','WMT','MA','JNJ','PG','ORCL','HD','COST','BAC','KO','PEP','ADBE','CSCO','CRM','NFLX','AMD','MCD','DIS','IBM','CAT','GE','PFE','NKE','BA','GS','MS','AXP','WFC','F','GM','COIN','EL','DE','PYPL','SBUX','UBER','TGT','COP','XOM','CVX','BLSH','TTM','SOXL','AMPX','SOLT'].forEach(t => m[t] = t);
+  m['BRK.B'] = 'BRK-B';
+  // UK stocks — Yahoo wants .L suffix (already in our ticker for these)
+  ['HSBA.L','BP.L','SHEL.L','AZN.L','GSK.L','ULVR.L','RIO.L','AAL.L','GLEN.L','LLOY.L','BARC.L','NWG.L','VOD.L','BATS.L','DGE.L','REL.L','RR.L','PRU.L','TSCO.L','NXT.L','BRBY.L','IHG.L','OCDO.L'].forEach(t => m[t] = t);
+  m['BT-A.L'] = 'BT-A.L'; m['BA.L'] = 'BA.L';
+  // Resources
+  ['BHP','RIO','VALE','TECK','FCX','SCCO','NEM','AEM','GFI','AU','KGC','PAAS','WPM','FNV','RGLD','ALB','SQM','SGML','CCJ','NXE','DNN','URA','TTE','EQNR','EOG','OXY','SLB','MT','BTU','SAND','TFPM','AMPX'].forEach(t => m[t] = t);
+  m['GOLDM'] = 'GOLD'; // Barrick (we use GOLDM internally to free up GOLD for the commodity)
+  m['FM.TO'] = 'FM.TO'; m['IVN.TO'] = 'IVN.TO'; m['LUN.TO'] = 'LUN.TO';
+  m['S32.AX'] = 'S32.AX'; m['FMG.AX'] = 'FMG.AX'; m['PLS.AX'] = 'PLS.AX'; m['PDN.AX'] = 'PDN.AX';
+  m['ANTO.L'] = 'ANTO.L'; m['FRES.L'] = 'FRES.L'; m['BHP.L'] = 'BHP.L'; m['KGH.WA'] = 'KGH.WA';
+  // Junior resources from the seed spreadsheet (best-guess Yahoo symbols)
+  m['THX']  = 'THX.V';   // Thor Explorations (TSXV)
+  m['DTR']  = 'DTR.AX';  // Dateline Resources (ASX)
+  m['SRL']  = 'SRL.AX';  // Sunrise Energy Metals (ASX)
+  m['FRS']  = 'FRS.AX';  // Forrestania Resources (ASX)
+  m['PSC']  = 'PSC.AX';  // Prospect Resources (ASX)
+  m['PGDC'] = 'PGDC.V';  // Patagonia Gold (TSXV)
+  // Crypto
+  m['BTC'] = 'BTC-USD'; m['ETH'] = 'ETH-USD'; m['SOL'] = 'SOL-USD';
+  // Commodities
+  m['GOLD']   = 'GC=F';
+  m['SILVER'] = 'SI=F';
+  m['OIL']    = 'CL=F';
+  return m;
+})();
+
+const PROXIES = [
+  { name:'cors.lol',       build: u => `https://api.cors.lol/?url=${encodeURIComponent(u)}`,           parse:'json' },
+  { name:'corsproxy',      build: u => `https://corsproxy.io/?${encodeURIComponent(u)}`,                parse:'json' },
+  { name:'allorigins/raw', build: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,   parse:'json' },
+  { name:'allorigins/get', build: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,   parse:'wrapped' },
+  { name:'codetabs',       build: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, parse:'json' },
+];
+const PROXY_TIMEOUT_MS = 8000;
+const BATCH_SIZE = 18;
+const LIVE_REFRESH_MS = 60000;
+const LIVE_STALE_MS = 180000;
+
+const proxyHealth = Object.fromEntries(PROXIES.map(p => [p.name, { fails:0, benchedUntil:0 }]));
+function markFail(name) {
+  const h = proxyHealth[name]; if (!h) return;
+  h.fails += 1;
+  if (h.fails >= 3) { h.benchedUntil = Date.now() + 5*60*1000; h.fails = 0; }
+}
+function markOk(name) { const h = proxyHealth[name]; if (h) { h.fails = 0; h.benchedUntil = 0; } }
+function healthyProxies() {
+  const now = Date.now();
+  return PROXIES.filter(p => (proxyHealth[p.name].benchedUntil || 0) <= now);
+}
+
+async function fetchWithTimeout(url, timeoutMs) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), timeoutMs);
+  try { return await fetch(url, { signal: ctrl.signal }); }
+  finally { clearTimeout(id); }
+}
+
+async function fetchBatchViaProxy(symbols, p) {
+  const yahoo = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbols.map(encodeURIComponent).join(',')}&range=2d&interval=1d`;
+  const r = await fetchWithTimeout(p.build(yahoo), PROXY_TIMEOUT_MS);
+  if (!r.ok) { markFail(p.name); throw new Error(`HTTP ${r.status}`); }
+  const raw = await r.text();
+  if (/^Edge: Too Many|rate.*limit|cloudflare|Rate limit exceeded/i.test(raw.slice(0, 100))) {
+    markFail(p.name); throw new Error('rate-limited');
+  }
+  let json;
+  try {
+    const parsed = JSON.parse(raw);
+    json = p.parse === 'wrapped' ? JSON.parse(parsed.contents) : parsed;
+  } catch (e) { markFail(p.name); throw e; }
+  const result = json?.spark?.result;
+  if (!Array.isArray(result)) { markFail(p.name); throw new Error('no spark.result'); }
+  markOk(p.name);
+  return result;
+}
+
+async function fetchBatchSpark(symbols) {
+  if (!symbols.length) return {};
+  const out = {};
+  const proxies = healthyProxies().length ? healthyProxies() : [PROXIES[0]];
+  for (const p of proxies) {
+    try {
+      const result = await fetchBatchViaProxy(symbols, p);
+      for (const item of result) {
+        const meta = item?.response?.[0]?.meta;
+        const cur = meta?.regularMarketPrice;
+        const prev = meta?.chartPreviousClose ?? meta?.previousClose;
+        if (typeof cur === 'number') {
+          out[item.symbol] = {
+            cur,
+            prev: (typeof prev === 'number' && prev > 0) ? prev : cur,
+            currency: meta?.currency || 'USD',
+          };
+        }
+      }
+      return out; // first successful proxy wins
+    } catch (e) {
+      // try next proxy
+    }
+  }
+  return out;
+}
+
+function priceToUSD(localPrice, currency, fxRates) {
+  if (!Number.isFinite(localPrice)) return null;
+  if (!currency || currency === 'USD' || currency === 'USd') return localPrice;
+  if (currency === 'GBp') {
+    const fx = fxRates['GBPUSD=X']?.cur;
+    return fx ? (localPrice / 100) * fx : null;
+  }
+  if (currency === 'GBP') {
+    const fx = fxRates['GBPUSD=X']?.cur;
+    return fx ? localPrice * fx : null;
+  }
+  if (currency === 'AUD') {
+    const fx = fxRates['AUDUSD=X']?.cur;
+    return fx ? localPrice * fx : null;
+  }
+  if (currency === 'CAD') {
+    const fx = fxRates['CADUSD=X']?.cur;
+    return fx ? localPrice * fx : null;
+  }
+  if (currency === 'EUR') {
+    const fx = fxRates['EURUSD=X']?.cur;
+    return fx ? localPrice * fx : null;
+  }
+  if (currency === 'PLN') {
+    const fx = fxRates['PLNUSD=X']?.cur;
+    return fx ? localPrice * fx : null;
+  }
+  return localPrice; // unknown currency, return as-is
+}
+
+async function fetchAllLivePrices() {
+  // Build the symbol list (FX rates first so they're already in cache when conversion runs)
+  const fxSymbols = ['GBPUSD=X','AUDUSD=X','CADUSD=X','EURUSD=X','PLNUSD=X'];
+  const tickerToYahoo = {};
+  const yahooToTicker = {};
+  for (const a of UNIVERSE) {
+    const ys = YAHOO_SYMBOLS[a.t];
+    if (ys) { tickerToYahoo[a.t] = ys; yahooToTicker[ys] = a.t; }
+  }
+  const stockSymbols = Object.values(tickerToYahoo);
+  const allSymbols = [...fxSymbols, ...stockSymbols];
+
+  // Batch
+  const batches = [];
+  for (let i = 0; i < allSymbols.length; i += BATCH_SIZE) batches.push(allSymbols.slice(i, i+BATCH_SIZE));
+
+  // Run batches with small spacing to avoid rate limits
+  const merged = {};
+  for (let bi = 0; bi < batches.length; bi++) {
+    const part = await fetchBatchSpark(batches[bi]);
+    Object.assign(merged, part);
+    if (bi < batches.length - 1) await new Promise(r => setTimeout(r, 150));
+  }
+
+  // Extract FX rates
+  const fxRates = {};
+  for (const s of fxSymbols) if (merged[s]) fxRates[s] = merged[s];
+
+  // Build output keyed by internal ticker, with USD-converted prices
+  const prices = {};
+  let liveCount = 0;
+  for (const [ys, p] of Object.entries(merged)) {
+    if (fxSymbols.includes(ys)) continue; // FX rates handled separately
+    const tk = yahooToTicker[ys];
+    if (!tk) continue;
+    const curUSD  = priceToUSD(p.cur,  p.currency, fxRates);
+    const prevUSD = priceToUSD(p.prev, p.currency, fxRates);
+    if (curUSD == null) continue;
+    prices[tk] = { cur: curUSD, dayOpen: prevUSD ?? curUSD, currency: p.currency };
+    liveCount++;
+  }
+
+  return { ok: liveCount > 0, prices, fxRates, count: liveCount, total: stockSymbols.length };
+}
+
+/* ---------------- HISTORICAL BARS (for the race chart) ----------------------
+ * Yahoo /v7/finance/spark with range=1mo&interval=1d returns one closing
+ * price per trading day for the last month. Cached in module scope so we
+ * only pay the network cost once per session.
+ * --------------------------------------------------------------------------- */
+const HIST_CACHE = new Map(); // yahooSymbol -> [{date, close, currency}]
+
+async function fetchHistoricalBatch(symbols, p) {
+  const yahoo = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbols.map(encodeURIComponent).join(',')}&range=1mo&interval=1d`;
+  const r = await fetchWithTimeout(p.build(yahoo), PROXY_TIMEOUT_MS);
+  if (!r.ok) { markFail(p.name); throw new Error(`HTTP ${r.status}`); }
+  const raw = await r.text();
+  if (/^Edge: Too Many|rate.*limit|cloudflare|Rate limit exceeded/i.test(raw.slice(0, 100))) {
+    markFail(p.name); throw new Error('rate-limited');
+  }
+  let json;
+  try {
+    const parsed = JSON.parse(raw);
+    json = p.parse === 'wrapped' ? JSON.parse(parsed.contents) : parsed;
+  } catch (e) { markFail(p.name); throw e; }
+  const result = json?.spark?.result;
+  if (!Array.isArray(result)) { markFail(p.name); throw new Error('no spark.result'); }
+  markOk(p.name);
+  return result;
+}
+
+async function fetchHistoricalBars(symbols) {
+  const out = {};
+  // Pull cache for symbols already fetched
+  const misses = [];
+  for (const s of symbols) {
+    if (HIST_CACHE.has(s)) out[s] = HIST_CACHE.get(s);
+    else misses.push(s);
+  }
+  if (misses.length === 0) return out;
+
+  const batches = [];
+  for (let i = 0; i < misses.length; i += BATCH_SIZE) batches.push(misses.slice(i, i+BATCH_SIZE));
+
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
+    const proxies = healthyProxies().length ? healthyProxies() : [PROXIES[0]];
+    let resolved = false;
+    for (const p of proxies) {
+      try {
+        const result = await fetchHistoricalBatch(batch, p);
+        for (const item of result) {
+          const meta = item?.response?.[0]?.meta;
+          const ts = item?.response?.[0]?.timestamp;
+          const closes = item?.response?.[0]?.indicators?.quote?.[0]?.close;
+          if (Array.isArray(ts) && Array.isArray(closes)) {
+            const bars = ts.map((t, i) => ({
+              date: new Date(t*1000).toISOString().slice(0,10),
+              close: closes[i],
+              currency: meta?.currency || 'USD',
+            })).filter(b => b.close != null);
+            if (bars.length > 0) {
+              out[item.symbol] = bars;
+              HIST_CACHE.set(item.symbol, bars);
+            }
+          }
+        }
+        resolved = true;
+        break;
+      } catch (e) { /* try next proxy */ }
+    }
+    if (!resolved) console.warn(`[FBC history] all proxies failed for batch ${bi+1}/${batches.length}`);
+    if (bi < batches.length - 1) await new Promise(r => setTimeout(r, 200));
+  }
+  return out;
+}
+
+// Per-date FX lookup. fxBars maps Yahoo FX symbol → bars array.
+function lookupFxOnDate(symbol, date, fxBars) {
+  const bars = fxBars[symbol];
+  if (!bars || bars.length === 0) return 1;
+  for (let i = bars.length - 1; i >= 0; i--) {
+    if (bars[i].date <= date) return bars[i].close;
+  }
+  return bars[0].close;
+}
+
+function priceToUSDOnDate(localPrice, currency, date, fxBars) {
+  if (!Number.isFinite(localPrice)) return null;
+  if (!currency || currency === 'USD' || currency === 'USd') return localPrice;
+  let major = localPrice;
+  if (currency === 'GBp') major = localPrice / 100;
+  const fxSym = currency === 'GBp' || currency === 'GBP' ? 'GBPUSD=X'
+              : currency === 'AUD' ? 'AUDUSD=X'
+              : currency === 'CAD' ? 'CADUSD=X'
+              : currency === 'EUR' ? 'EURUSD=X'
+              : currency === 'PLN' ? 'PLNUSD=X'
+              : null;
+  if (!fxSym) return major;
+  return major * lookupFxOnDate(fxSym, date, fxBars);
+}
+
+// Build a list of weekly checkpoint dates: quarter start (baseline) +
+// every Friday between start and end + today (if within range and not already a Friday).
+function weeklyCheckpoints(startISO, endISO) {
+  const dates = [startISO];
+  const start = new Date(startISO + 'T00:00:00Z');
+  const end   = new Date(endISO   + 'T00:00:00Z');
+  // Walk to first Friday at-or-after start (Friday = 5)
+  const d = new Date(start);
+  while (d.getUTCDay() !== 5) d.setUTCDate(d.getUTCDate() + 1);
+  const today = new Date(todayISO() + 'T00:00:00Z');
+  while (d <= end && d <= today) {
+    const iso = d.toISOString().slice(0,10);
+    if (iso !== startISO) dates.push(iso);
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
+  // Append today if it's within the quarter and not already in the list
+  const todayISOStr = todayISO();
+  if (todayISOStr >= startISO && todayISOStr <= endISO && !dates.includes(todayISOStr)) {
+    dates.push(todayISOStr);
+  }
+  return dates;
+}
+
+// Replay each player's trades to build a weekly portfolio-value time series.
+// First point is always $10,000 (the synthetic "everyone starts here" baseline).
+// Subsequent points are end-of-week (Friday) closes; the final point is today
+// using the latest live/cached prices.
+function buildPortfolioHistory(state, histBars, livePrices) {
+  const fxSyms = ['GBPUSD=X','AUDUSD=X','CADUSD=X','EURUSD=X','PLNUSD=X'];
+  const fxBars = {};
+  for (const s of fxSyms) if (histBars && histBars[s]) fxBars[s] = histBars[s];
+
+  // Build close lookup: internal-ticker → { date: closeUSD }
+  const closeMap = {};
+  if (histBars) {
+    for (const a of UNIVERSE) {
+      const ys = YAHOO_SYMBOLS[a.t] || a.t;
+      const bars = histBars[ys];
+      if (!bars) continue;
+      closeMap[a.t] = {};
+      for (const b of bars) {
+        const usd = priceToUSDOnDate(b.close, b.currency, b.date, fxBars);
+        if (usd != null) closeMap[a.t][b.date] = usd;
+      }
+    }
+  }
+
+  // For a given date, return most recent close <= date (handles weekends + missing bars)
+  function priceOn(ticker, date) {
+    const m = closeMap[ticker];
+    if (!m) return null;
+    if (m[date] != null) return m[date];
+    const allDates = Object.keys(m).sort();
+    for (let i = allDates.length - 1; i >= 0; i--) {
+      if (allDates[i] <= date) return m[allDates[i]];
+    }
+    return null;
+  }
+
+  const dates = weeklyCheckpoints(QUARTER_START, QUARTER_END);
+  const todayISOStr = todayISO();
+  const allTrades = [...state.trades].sort((a,b) => a.ts.localeCompare(b.ts));
+
+  const series = {};
+  for (const pid of state.order) {
+    series[pid] = [];
+    const playerTrades = allTrades.filter(t => t.player_id === pid);
+
+    for (const date of dates) {
+      let val;
+      if (date === QUARTER_START) {
+        // Synthetic baseline: everyone starts at $10,000 before any trades
+        val = STARTING_CASH;
+      } else {
+        // Replay trades up to end-of-this-date, then value holdings at this date's close
+        let cash = STARTING_CASH;
+        const holdings = {};
+        for (const t of playerTrades) {
+          if (t.ts.slice(0,10) > date) break;
+          if (t.action === 'buy') {
+            cash -= t.value;
+            if (!holdings[t.ticker]) holdings[t.ticker] = { units: 0, cost: 0 };
+            holdings[t.ticker].units += t.units;
+            holdings[t.ticker].cost  += t.value;
+          } else {
+            const h = holdings[t.ticker];
+            if (h && h.units > 0) {
+              const ratio = Math.min(1, t.units / h.units);
+              h.cost  -= h.cost * ratio;
+              h.units -= t.units;
+              cash    += t.value;
+            }
+          }
+        }
+        val = cash;
+        for (const [tk, h] of Object.entries(holdings)) {
+          if (h.units < 1e-9) continue;
+          // For TODAY, prefer the latest live price (most recent refresh)
+          let px = null;
+          if (date === todayISOStr && livePrices && livePrices[tk]?.cur) {
+            px = livePrices[tk].cur;
+          }
+          if (px == null) px = priceOn(tk, date);
+          if (px != null) {
+            val += h.units * px;
+          } else {
+            val += h.cost; // no data — hold flat at cost basis
+          }
+        }
+      }
+      series[pid].push({ date, value: val });
+    }
+  }
+  return { dates, series, fxBars };
+}
+
+/* ---------------- Portfolio math ---------------- */
+function playerValue(player, prices) {
+  const holdingsValue = Object.entries(player.holdings || {}).reduce((s, [t, h]) => {
+    const px = prices[t]?.cur ?? 0;
+    return s + h.units * px;
+  }, 0);
+  return (player.cash || 0) + holdingsValue;
+}
+function playerPL(player, prices) {
+  return playerValue(player, prices) - STARTING_CASH;
+}
+function playerPLPct(player, prices) {
+  return playerPL(player, prices) / STARTING_CASH * 100;
+}
+
+/* ============================================================
+ * COMPONENTS
+ * ============================================================ */
+
+/* ---------- Bloomberg-style landing dashboard ---------- */
+function timeSinceShort(ts) {
+  if (!ts) return 'never';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function Dashboard({ prices, recentlyChanged, onPlay, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Heatmap subset: top names by base price (proxy for size) — limit to 28 tiles
+  const heatmapTickers = useMemo(() => {
+    const us = UNIVERSE.filter(a => a.b === 'us').slice(0, 14).map(a => a.t);
+    const uk = UNIVERSE.filter(a => a.b === 'uk').slice(0, 6).map(a => a.t);
+    const res = UNIVERSE.filter(a => a.b === 'res').slice(0, 6).map(a => a.t);
+    const oth = UNIVERSE.filter(a => a.b === 'oth').slice(0, 4).map(a => a.t);
+    return [...us, ...uk, ...res, ...oth];
+  }, []);
+
+  // Top movers (refreshes every render so the columns rotate as prices move)
+  const movers = useMemo(() => {
+    const allWithChg = Object.keys(prices).map(t => ({
+      t, a: ASSETS[t], chg: dailyChangePct(prices[t])
+    })).filter(x => x.a);
+    const sorted = [...allWithChg].sort((a,b) => b.chg - a.chg);
+    return {
+      gainers: sorted.slice(0, 6),
+      losers: sorted.slice(-6).reverse(),
+    };
+  }, [prices]);
+
+  // Index summary (synthetic from a basket)
+  const indexSummary = useMemo(() => {
+    const avgChg = (tickers) => {
+      const xs = tickers.map(t => dailyChangePct(prices[t])).filter(x => Number.isFinite(x));
+      return xs.length ? xs.reduce((s,x)=>s+x,0) / xs.length : 0;
+    };
+    const sp = avgChg(UNIVERSE.filter(a => a.b === 'us').map(a => a.t));
+    const ft = avgChg(UNIVERSE.filter(a => a.b === 'uk').map(a => a.t));
+    return [
+      { name: 'S&P 500',  chg: sp, val: 5632 * (1 + sp/100) },
+      { name: 'FTSE 100', chg: ft, val: 8234 * (1 + ft/100) },
+      { name: 'GOLD',     chg: dailyChangePct(prices['GOLD']),   val: prices['GOLD']?.cur ?? 0 },
+      { name: 'OIL',      chg: dailyChangePct(prices['OIL']),    val: prices['OIL']?.cur ?? 0 },
+      { name: 'BTC',      chg: dailyChangePct(prices['BTC']),    val: prices['BTC']?.cur ?? 0 },
+    ];
+  }, [prices]);
+
+  // Ticker tape items — use a long fixed list, doubled for seamless scroll
+  const tapeItems = useMemo(() => {
+    // Just take all universe tickers in random order
+    const arr = [...UNIVERSE];
+    arr.sort(() => Math.random() - 0.5);
+    return arr;
+  }, []);
+
+  return (
+    <div className="fbc-dashboard">
+      <div className="fbc-d-header">
+        <div>
+          <span className="fbc-d-title term-glow">FUTURE BILLIONAIRES CLUB</span>
+          <span className="fbc-d-clock" style={{marginLeft:16}}>
+            {now.toUTCString().slice(0,25)} UTC
+          </span>
+        </div>
+        <div style={{display:'flex', gap:10, alignItems:'center'}}>
+          <button
+            onClick={onRefresh}
+            disabled={fetchInFlight}
+            style={{
+              background: fetchInFlight ? '#3a3326' : '#2a2418',
+              color: 'var(--term-amber)',
+              border: '1px solid var(--term-amber)',
+              fontFamily: 'var(--term-mono)', fontSize: 12, fontWeight: 700,
+              letterSpacing: '0.18em', padding: '8px 16px', cursor: fetchInFlight ? 'wait' : 'pointer',
+              borderRadius: 2,
+            }}
+          >{fetchInFlight ? '↻ FETCHING…' : '↻ REFRESH PRICES'}</button>
+          <button className="fbc-d-play" onClick={onPlay}>▶ PLAY</button>
+        </div>
+      </div>
+      <div style={{
+        background: 'var(--term-panel)', borderBottom: '1px solid var(--term-border)',
+        padding: '6px 16px', fontSize: 11, color: 'var(--term-dim)',
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+      }}>
+        <span>
+          <span className={dataMode === 'live' ? 'live' : dataMode === 'stale' ? 'stale' : 'sim'} style={{color: dataMode==='live'?'var(--term-green)':dataMode==='stale'?'var(--term-red)':'var(--term-amber)'}}>
+            ●
+          </span>{' '}
+          {lastFetchAt
+            ? <>last refresh <span style={{color:'var(--term-text)'}}>{timeSinceShort(lastFetchAt)}</span> · {liveCount}/{liveTotal} tickers</>
+            : <>no live data yet — tap REFRESH PRICES</>}
+        </span>
+        <span>animation off · prices update on refresh only</span>
+      </div>
+
+      {/* Index strip */}
+      <div className="fbc-d-indexstrip">
+        {indexSummary.map(idx => {
+          const cls = idx.chg >= 0 ? 'up' : 'down';
+          return (
+            <div key={idx.name}>
+              <span className="fbc-d-idx-name">{idx.name}</span>
+              <span className="fbc-d-idx-val">{idx.name === 'BTC' ? fmtUSD0(idx.val) : idx.val.toFixed(2)}</span>
+              <span className={`fbc-d-idx-chg ${cls}`}>{fmtPct(idx.chg, 2)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="fbc-d-sec-title">Heatmap · Major Holdings</div>
+      <div className="fbc-d-heatmap">
+        {heatmapTickers.map(t => {
+          const a = ASSETS[t]; if (!a) return null;
+          const p = prices[t]; if (!p) return null;
+          const chg = dailyChangePct(p);
+          const flash = recentlyChanged[t];
+          const tileClass = `fbc-d-tile ${chg>=0?'up':'down'} ${flash===1?'flash-up':flash===-1?'flash-down':''}`;
+          return (
+            <div key={t} className={tileClass}>
+              <div className="fbc-d-tile-tk">{t}</div>
+              <div className="fbc-d-tile-px">{p.cur < 1 ? p.cur.toFixed(4) : p.cur < 100 ? p.cur.toFixed(2) : p.cur < 10000 ? p.cur.toFixed(2) : Math.round(p.cur).toLocaleString()}</div>
+              <div className={`fbc-d-tile-ch ${chg>=0?'up':'down'}`}>{fmtPct(chg, 2)}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="fbc-d-sec-title">Top Movers</div>
+      <div className="fbc-d-movers">
+        <div className="fbc-d-movers-col">
+          <h4>▲ GAINERS</h4>
+          {movers.gainers.map(m => (
+            <div key={m.t} className="fbc-d-movers-row">
+              <span className="tk">{m.t}</span>
+              <span className="nm">{m.a?.n}</span>
+              <span className="ch up">{fmtPct(m.chg, 2)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="fbc-d-movers-col">
+          <h4>▼ LOSERS</h4>
+          {movers.losers.map(m => (
+            <div key={m.t} className="fbc-d-movers-row">
+              <span className="tk">{m.t}</span>
+              <span className="nm">{m.a?.n}</span>
+              <span className="ch down">{fmtPct(m.chg, 2)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="fbc-d-tape">
+        <div className="fbc-d-tape-track">
+          {[...tapeItems, ...tapeItems].map((a, i) => {
+            const p = prices[a.t];
+            if (!p) return null;
+            const chg = dailyChangePct(p);
+            return (
+              <span key={`${a.t}_${i}`} className="fbc-d-tape-item">
+                <span className="tk">{a.t}</span>
+                <span>{p.cur < 1 ? p.cur.toFixed(4) : p.cur < 100 ? p.cur.toFixed(2) : Math.round(p.cur).toLocaleString()}</span>
+                <span className={`ch ${chg>=0?'up':'down'}`}>{fmtPct(chg, 2)}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="fbc-d-status">
+        Future Billionaires Club · {Object.keys(prices).length} symbols tracked · refresh manually to update
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Game header ---------- */
+function GameHeader({ title, onBack, onSave, onLoad, dataMode, lastFetchAt, onRefresh }) {
+  const dot = dataMode === 'live' ? '🟢' : dataMode === 'stale' ? '🟡' : '⚪';
+  const label = dataMode === 'live' ? 'LIVE'
+              : dataMode === 'stale' ? 'STALE'
+              : 'SIM';
+  const ago = lastFetchAt ? Math.round((Date.now() - lastFetchAt) / 1000) : null;
+  return (
+    <div className="fbc-g-header">
+      <button className="fbc-g-back" onClick={onBack}>← Dashboard</button>
+      <span className="fbc-g-title">{title}</span>
+      <div className="fbc-g-actions">
+        <button
+          onClick={onRefresh}
+          title={ago != null ? `Last update ${ago}s ago — tap to refresh` : 'Tap to refresh prices'}
+          style={{
+            background:'#f6f1e3', border:'none', borderRadius:10, padding:'6px 10px',
+            fontWeight:700, fontSize:11, cursor:'pointer', letterSpacing:'0.06em'
+          }}
+        >{dot} {label}</button>
+        <button className="fbc-g-iconbtn" onClick={onSave} title="Download save file">💾</button>
+        <button className="fbc-g-iconbtn" onClick={onLoad} title="Load save file">📂</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Race chart (multi-line, one per player) ---------- */
+function RaceChart({ state, history }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (!history || !history.dates || history.dates.length === 0) return;
+    if (typeof Chart === 'undefined') {
+      console.warn('[FBC chart] Chart.js not loaded — skipping render');
+      return;
+    }
+
+    let labels, datasets;
+    try {
+      labels = history.dates;
+      datasets = state.order.map(pid => {
+      const p = state.players[pid];
+      const data = history.series[pid].map(pt => Math.round(pt.value));
+      return {
+        label: `${p.emoji} ${p.name}`,
+        data,
+        borderColor: p.color,
+        backgroundColor: p.color + '22',
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2.5,
+        fill: false,
+      };
+    });
+
+    } catch (e) {
+      console.error('[FBC chart] dataset prep failed:', e);
+      return;
+    }
+
+    try {
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y: {
+            ticks: {
+              callback: (v) => '$' + Math.round(v).toLocaleString(),
+              font: { size: 11 },
+            },
+            grid: { color: '#f0e9d8' },
+          },
+          x: {
+            ticks: {
+              maxTicksLimit: 7,
+              font: { size: 10 },
+              callback: function(value) {
+                const lbl = this.getLabelForValue(value);
+                if (!lbl) return lbl;
+                const d = new Date(lbl + 'T00:00:00Z');
+                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+              },
+            },
+            grid: { display: false },
+          },
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { boxWidth: 14, font: { size: 12, weight: '700' }, padding: 10 },
+          },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const lbl = items[0].label;
+                const d = new Date(lbl + 'T00:00:00Z');
+                return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+              },
+              label: (ctx) => `${ctx.dataset.label}: $${ctx.raw.toLocaleString()}`,
+            },
+          },
+          // $10,000 starting reference line via Chart.js annotation-style fake dataset
+        },
+      },
+      plugins: [{
+        id: 'startingLine',
+        afterDraw: (chart) => {
+          const yScale = chart.scales.y;
+          const xScale = chart.scales.x;
+          const y = yScale.getPixelForValue(STARTING_CASH);
+          if (Number.isFinite(y) && y >= chart.chartArea.top && y <= chart.chartArea.bottom) {
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.strokeStyle = '#9aa3b6';
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(xScale.left, y);
+            ctx.lineTo(xScale.right, y);
+            ctx.stroke();
+            ctx.fillStyle = '#9aa3b6';
+            ctx.font = '10px ui-sans-serif';
+            ctx.fillText('$10,000 start', xScale.left + 4, y - 4);
+            ctx.restore();
+          }
+        },
+      }],
+    });
+    } catch (e) {
+      console.error('[FBC chart] Chart.js init failed:', e);
+    }
+
+    return () => {
+      if (chartRef.current) { try { chartRef.current.destroy(); } catch {} chartRef.current = null; }
+    };
+  }, [history, state]);
+
+  if (!history) {
+    return (
+      <div style={{height: 100, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--game-soft)', fontSize:13}}>
+        Loading historical prices… (Yahoo via CORS proxy)
+      </div>
+    );
+  }
+  if (history.error) {
+    return (
+      <div style={{padding:14, background:'#ffe9eb', borderRadius:10, color:'#dc2626', fontSize:12}}>
+        Chart data error: {history.error}
+      </div>
+    );
+  }
+  if (!history.dates || history.dates.length === 0) {
+    return (
+      <div style={{padding:14, background:'#fff8e1', borderRadius:10, color:'#8d6e00', fontSize:12}}>
+        Historical prices unavailable. CORS proxies didn't return bars — check Chrome DevTools console for `[FBC history]` log.
+      </div>
+    );
+  }
+  if (typeof Chart === 'undefined') {
+    return (
+      <div style={{padding:14, background:'#fff8e1', borderRadius:10, color:'#8d6e00', fontSize:12}}>
+        Chart.js didn't load (offline or CDN blocked). Race chart unavailable; leaderboard below still works.
+      </div>
+    );
+  }
+  return (
+    <div style={{height: 260, position:'relative'}}>
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+
+/* ---------- Refresh banner — shown on home view above the chart ---------- */
+function RefreshBanner({ lastFetchAt, dataMode, liveCount, liveTotal, onRefresh, fetchInFlight }) {
+  const ago = lastFetchAt ? timeSinceShort(lastFetchAt) : 'never';
+  const dot = dataMode === 'live' ? '🟢' : dataMode === 'stale' ? '🟡' : '⚪';
+  return (
+    <div className="fbc-g-card" style={{
+      display:'flex', alignItems:'center', justifyContent:'space-between',
+      gap: 12, padding: '12px 14px',
+    }}>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:12, color:'var(--game-soft)', letterSpacing:'0.05em'}}>
+          {dot} Last refresh
+        </div>
+        <div style={{fontSize:15, fontWeight:800, marginTop:2}}>
+          {ago}
+          {lastFetchAt && liveTotal > 0 && (
+            <span style={{fontSize:11, fontWeight:600, color:'var(--game-soft)', marginLeft:8}}>
+              ({liveCount}/{liveTotal} tickers)
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onRefresh}
+        disabled={fetchInFlight}
+        style={{
+          background: fetchInFlight ? '#bfb6a3' : 'var(--game-accent)',
+          color: 'white', border: 'none', borderRadius: 14,
+          padding: '14px 22px', fontSize: 15, fontWeight: 800,
+          letterSpacing: '0.05em', cursor: fetchInFlight ? 'wait' : 'pointer',
+          whiteSpace:'nowrap',
+        }}
+      >{fetchInFlight ? '↻ FETCHING…' : '↻ REFRESH PRICES'}</button>
+    </div>
+  );
+}
+
+/* ---------- Player select / home (with leaderboard) ---------- */
+function PlayerSelect({ state, prices, onPickPlayer, onRenamePlayer, history, lastFetchAt, dataMode, liveCount, liveTotal, onRefresh, fetchInFlight }) {
+  const sorted = useMemo(() => {
+    return state.order.map(pid => {
+      const p = state.players[pid];
+      const value = playerValue(p, prices);
+      const pl = value - STARTING_CASH;
+      const plPct = pl / STARTING_CASH * 100;
+      return { pid, p, value, pl, plPct };
+    }).sort((a,b) => b.value - a.value);
+  }, [state, prices]);
+
+  return (
+    <>
+      <RefreshBanner
+        lastFetchAt={lastFetchAt}
+        dataMode={dataMode}
+        liveCount={liveCount}
+        liveTotal={liveTotal}
+        onRefresh={onRefresh}
+        fetchInFlight={fetchInFlight}
+      />
+
+      <div className="fbc-g-card">
+        <h2 className="fbc-g-h2">📈 The Race — Q2 2026</h2>
+        <div style={{fontSize:12, color:'var(--game-soft)', marginBottom:10}}>
+          Each player's portfolio value, day by day, since 1 April. Hover or tap a line to see exact values.
+        </div>
+        <RaceChart state={state} history={history} />
+      </div>
+
+      <div className="fbc-g-card">
+        <h2 className="fbc-g-h2">🏆 Leaderboard — {QUARTER_LABEL}</h2>
+        <div style={{fontSize:12, color:'var(--game-soft)', marginBottom:10}}>
+          {QUARTER_START} → {QUARTER_END} · everyone started with {fmtUSD0(STARTING_CASH)}
+        </div>
+        {sorted.map((row, i) => (
+          <div key={row.pid} className={`fbc-g-rank ${i === 0 ? 'first' : ''}`}>
+            <span className="fbc-g-rank-pos">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
+            <span className="fbc-g-rank-name">{row.p.emoji} {row.p.name}</span>
+            <span className="fbc-g-rank-val">{fmtUSD0(row.value)}</span>
+            <span className={`fbc-g-rank-pl ${row.pl >= 0 ? 'up' : 'down'}`}>{fmtPct(row.plPct, 1)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="fbc-g-card">
+        <h2 className="fbc-g-h2">Pick a player</h2>
+        <div style={{fontSize:11, color:'var(--game-soft)', marginBottom:8}}>
+          Tap ✎ next to a player to rename them. Names save to this device only.
+        </div>
+        <div className="fbc-g-players">
+          {state.order.map(pid => {
+            const p = state.players[pid];
+            const value = playerValue(p, prices);
+            const pl = value - STARTING_CASH;
+            const plPct = pl / STARTING_CASH * 100;
+            const cls = `fbc-g-player-card ${pid}`;
+            return (
+              <div key={pid} className={cls} onClick={() => onPickPlayer(pid)}>
+                <button
+                  className="fbc-g-player-rename"
+                  onClick={e => { e.stopPropagation(); onRenamePlayer && onRenamePlayer(pid); }}
+                  aria-label={`Rename ${p.name}`}
+                  title="Rename"
+                >✎</button>
+                <div className="fbc-g-player-emoji">{p.emoji}</div>
+                <div className="fbc-g-player-name">{p.name}</div>
+                <div className="fbc-g-player-stat">{fmtUSD0(value)}</div>
+                <div className={`fbc-g-player-pl ${pl >= 0 ? 'up' : 'down'}`}>{fmtPct(plPct, 1)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Asset browser (for Trade tab) ---------- */
+function AssetBrowser({ prices, onPick }) {
+  const [bucket, setBucket] = useState('us');
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    let arr = UNIVERSE.filter(a => bucket === 'all' || a.b === bucket);
+    const q = query.trim().toUpperCase();
+    if (q) arr = arr.filter(a => a.t.includes(q) || a.n.toUpperCase().includes(q));
+    return arr.slice(0, 200);
+  }, [bucket, query]);
+
+  return (
+    <>
+      <input
+        className="fbc-g-search"
+        placeholder="🔎 search by name or ticker..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+      <div className="fbc-g-bucket-tabs">
+        {BUCKET_ORDER.map(b => (
+          <button
+            key={b}
+            className={`fbc-g-bucket ${bucket === b ? 'active' : ''}`}
+            onClick={() => setBucket(b)}
+          >{BUCKET_LABELS[b]}</button>
+        ))}
+      </div>
+      <div>
+        {filtered.map(a => {
+          const p = prices[a.t];
+          const px = p?.cur ?? 0;
+          const chg = dailyChangePct(p);
+          return (
+            <div key={a.t} className="fbc-g-asset-row" onClick={() => onPick(a.t)}>
+              <span className="fbc-g-asset-emoji">{a.e}</span>
+              <span>
+                <div className="fbc-g-asset-tk">{(p?.liveAt && (Date.now()-p.liveAt)<90000) ? '🟢' : '⚪'} {a.t}</div>
+                <div className="fbc-g-asset-nm">{a.n}</div>
+              </span>
+              <span>
+                <div className="fbc-g-asset-px">{px < 1 ? fmtUSD(px, 4) : px < 100 ? fmtUSD(px, 2) : fmtUSD0(px)}</div>
+                <div className={`fbc-g-asset-ch ${chg >= 0 ? 'up' : 'down'}`}>{fmtPct(chg, 2)}</div>
+              </span>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && <div className="fbc-g-empty"><div className="emoji">🔍</div><div className="msg">No matches.</div></div>}
+      </div>
+    </>
+  );
+}
+
+/* ---------- Trade modal (buy / sell sheet) ---------- */
+function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
+  const a = ASSETS[ticker];
+  const p = prices[ticker];
+  const px = p?.cur ?? 0;
+  const chg = dailyChangePct(p);
+  const blurb = BLURBS[ticker] || `${a.s} · ${a.n}`;
+  const holding = player.holdings[ticker];
+  const ownedUnits = holding?.units ?? 0;
+  const ownedValue = ownedUnits * px;
+
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState('');
+  const amountNum = parseFloat(amount) || 0;
+
+  function quickSet(v) {
+    if (action === 'buy') {
+      const cap = Math.min(player.cash, 5000);
+      const presets = [50, 100, 250, Math.max(50, Math.floor(cap))];
+      setAmount(String(presets[v]));
+    } else {
+      // sell: amount in USD
+      const presets = [
+        Math.floor(ownedValue * 0.25),
+        Math.floor(ownedValue * 0.5),
+        Math.floor(ownedValue * 0.75),
+        Math.floor(ownedValue),
+      ];
+      setAmount(String(presets[v]));
+    }
+  }
+
+  function handleConfirm() {
+    setError('');
+    if (amountNum <= 0) { setError('Enter an amount.'); return; }
+    if (action === 'buy') {
+      if (amountNum > player.cash + 0.01) { setError(`You only have ${fmtUSD(player.cash, 2)} in cash.`); return; }
+      const units = amountNum / px;
+      onConfirm({ action:'buy', ticker, units, price: px, value: amountNum });
+    } else {
+      if (amountNum > ownedValue + 0.01) { setError(`You only own ${fmtUSD(ownedValue, 2)} of ${ticker}.`); return; }
+      const units = amountNum / px;
+      onConfirm({ action:'sell', ticker, units, price: px, value: amountNum });
+    }
+  }
+
+  return (
+    <div className="fbc-g-trade-modal" onClick={onClose}>
+      <div className="fbc-g-trade-sheet" onClick={e => e.stopPropagation()}>
+        <button className="fbc-g-trade-close" onClick={onClose}>✕</button>
+        <div style={{fontSize:32}}>{a.e}</div>
+        <div className="fbc-g-trade-tk">{a.t}</div>
+        <div className="fbc-g-trade-nm">{a.n} · {a.s}</div>
+        <div className="fbc-g-trade-px">{px < 1 ? fmtUSD(px, 4) : fmtUSD(px, 2)}</div>
+        <div className={`fbc-g-trade-ch ${chg >= 0 ? 'up' : 'down'}`}>{fmtPct(chg, 2)} today</div>
+        <div className="fbc-g-trade-blurb">{blurb}</div>
+
+        {ownedUnits > 0 && (
+          <div style={{marginBottom:12, fontSize:13, color:'var(--game-soft)'}}>
+            You own {fmtUnits(ownedUnits)} units · {fmtUSD(ownedValue, 2)} · cost basis {fmtUSD((holding?.cost||0), 2)}
+          </div>
+        )}
+
+        <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>
+          {action === 'buy' ? 'How much $ do you want to buy?' : 'How much $ do you want to sell?'}
+        </div>
+        <input
+          className="fbc-g-amount-input"
+          type="number"
+          min="0"
+          step="1"
+          inputMode="decimal"
+          placeholder="$"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+        />
+        <div className="fbc-g-quick-amts">
+          {[0,1,2,3].map(i => <button key={i} onClick={() => quickSet(i)}>
+            {action === 'buy'
+              ? (i===0?'$50':i===1?'$100':i===2?'$250':'MAX')
+              : (i===0?'25%':i===1?'50%':i===2?'75%':'ALL')}
+          </button>)}
+        </div>
+        <div style={{fontSize:12, color:'var(--game-soft)', marginBottom:10}}>
+          {action === 'buy'
+            ? `Cash available: ${fmtUSD(player.cash, 2)}`
+            : `Holding value: ${fmtUSD(ownedValue, 2)}`}
+        </div>
+        {amountNum > 0 && (
+          <div style={{fontSize:13, marginBottom:10, padding:10, background:'#faf6ec', borderRadius:10}}>
+            That's <b>{fmtUnits(amountNum / px)}</b> units at {fmtUSD(px, 2)}
+          </div>
+        )}
+
+        <button
+          className={`fbc-g-action-btn ${action === 'sell' ? 'sell' : ''}`}
+          disabled={!amountNum}
+          onClick={handleConfirm}
+        >
+          {action === 'buy' ? 'BUY' : 'SELL'} {ticker}
+        </button>
+        {error && <div className="fbc-g-error">{error}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Portfolio (current player) ---------- */
+function PortfolioView({ player, prices, onSell }) {
+  const value = playerValue(player, prices);
+  const pl = value - STARTING_CASH;
+  const plPct = pl / STARTING_CASH * 100;
+  const now = Date.now();
+  const holdingsList = Object.entries(player.holdings || {})
+    .map(([t, h]) => {
+      const a = ASSETS[t];
+      const pState = prices[t];
+      const px = pState?.cur ?? 0;
+      const cur = h.units * px;
+      const hpl = cur - h.cost;
+      const hplPct = h.cost > 0 ? hpl / h.cost * 100 : 0;
+      const buyPrice = h.units > 0 ? h.cost / h.units : 0;
+      const isLive = !!(pState?.liveAt && (now - pState.liveAt) < 90_000);
+      return { t, a, h, px, cur, hpl, hplPct, buyPrice, isLive };
+    })
+    .filter(x => x.h.units > 1e-9 && x.a)
+    .sort((a,b) => b.cur - a.cur);
+
+  return (
+    <>
+      <div className="fbc-g-summary">
+        <div className="fbc-g-summary-cell">
+          <div className="fbc-g-summary-label">Total Value</div>
+          <div className="fbc-g-summary-value">{fmtUSD0(value)}</div>
+        </div>
+        <div className="fbc-g-summary-cell">
+          <div className="fbc-g-summary-label">P&L</div>
+          <div className={`fbc-g-summary-value ${pl>=0?'up':'down'}`}>{fmtPct(plPct, 1)}</div>
+        </div>
+        <div className="fbc-g-summary-cell">
+          <div className="fbc-g-summary-label">Cash</div>
+          <div className="fbc-g-summary-value">{fmtUSD0(player.cash)}</div>
+        </div>
+      </div>
+
+      <div className="fbc-g-card">
+        <h2 className="fbc-g-h2">Holdings</h2>
+        <div style={{fontSize:11, color:'var(--game-soft)', marginBottom:8}}>
+          🟢 = live price · ⚪ = simulated (Yahoo didn't return)
+        </div>
+        {holdingsList.length === 0 && <div className="fbc-g-empty"><div className="emoji">📭</div><div className="msg">No holdings yet. Tap Trade to buy something.</div></div>}
+        {holdingsList.map(({t, a, h, px, cur, hpl, hplPct, buyPrice, isLive}) => (
+          <div key={t} className="fbc-g-holding" onClick={() => onSell(t)}>
+            <span className="fbc-g-holding-emoji">{a.e}</span>
+            <span>
+              <div className="fbc-g-holding-tk">{isLive ? '🟢' : '⚪'} {a.t} · {a.n}</div>
+              <div className="fbc-g-holding-units">
+                {fmtUnits(h.units)} units · buy {fmtUSD(buyPrice, buyPrice<1?4:2)} → now {fmtUSD(px, px<1?4:2)}
+              </div>
+            </span>
+            <span>
+              <div className="fbc-g-holding-val">{fmtUSD0(cur)}</div>
+              <div className={`fbc-g-holding-pl ${hpl >= 0 ? 'up' : 'down'}`}>{fmtPct(hplPct, 1)} ({(hpl>=0?'+':'') + fmtUSD0(hpl)})</div>
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ---------- Trade history ---------- */
+function HistoryView({ trades, currentPid }) {
+  const playerTrades = trades.filter(t => t.player_id === currentPid).slice().reverse();
+  return (
+    <div className="fbc-g-card">
+      <h2 className="fbc-g-h2">Trade History</h2>
+      {playerTrades.length === 0 && <div className="fbc-g-empty"><div className="emoji">📜</div><div className="msg">No trades yet.</div></div>}
+      {playerTrades.map(t => {
+        const a = ASSETS[t.ticker];
+        return (
+          <div key={t.id} className="fbc-g-th-row">
+            <span className="fbc-g-holding-emoji">{a?.e || '·'}</span>
+            <span>
+              <div className="fbc-g-holding-tk">
+                <span className={`fbc-g-th-tag ${t.action}`}>{t.action.toUpperCase()}</span>
+                {' '}{t.ticker}
+              </div>
+              <div className="fbc-g-th-meta">{fmtUnits(t.units)} units @ {fmtUSD(t.price, 2)} · {t.ts.slice(0,10)}</div>
+            </span>
+            <span>
+              <div className="fbc-g-holding-val">{fmtUSD0(t.value)}</div>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Game container ---------- */
+function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight, history }) {
+  const [currentPid, setCurrentPid] = useState(null);
+  const [tab, setTab] = useState('home');     // home | trade | portfolio | history
+  const [tradeTicker, setTradeTicker] = useState(null);
+  const [tradeAction, setTradeAction] = useState('buy');
+
+  const player = currentPid ? state.players[currentPid] : null;
+
+  function pickPlayer(pid) {
+    setCurrentPid(pid);
+    setTab('home');
+  }
+
+  function renamePlayer(pid) {
+    const current = state.players[pid]?.name || '';
+    const entered = (typeof window !== 'undefined' && window.prompt)
+      ? window.prompt(`Rename "${current}":`, current)
+      : null;
+    if (entered == null) return;
+    const trimmed = entered.trim().slice(0, 24);
+    if (!trimmed || trimmed === current) return;
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.players[pid]) return prev;
+      next.players[pid].name = trimmed;
+      next.players[pid].short = trimmed.slice(0, 8);
+      next.last_modified = nowISO();
+      saveLocal(next);
+      return next;
+    });
+  }
+
+  function openTrade(ticker, action) {
+    setTradeTicker(ticker);
+    setTradeAction(action);
+  }
+
+  function executeTrade({ action, ticker, units, price, value }) {
+    setState(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const p = next.players[currentPid];
+      if (action === 'buy') {
+        p.cash -= value;
+        if (!p.holdings[ticker]) p.holdings[ticker] = { units:0, cost:0 };
+        p.holdings[ticker].units += units;
+        p.holdings[ticker].cost  += value;
+      } else {
+        // sell
+        const h = p.holdings[ticker];
+        if (!h) return prev;
+        const sellRatio = units / h.units;
+        const costRemoved = h.cost * sellRatio;
+        h.units -= units;
+        h.cost  -= costRemoved;
+        p.cash  += value;
+        if (h.units < 1e-9) delete p.holdings[ticker];
+      }
+      next.trades.push({
+        id: uid('t'),
+        player_id: currentPid,
+        ts: nowISO(),
+        action, ticker, units, price, value,
+      });
+      next.last_modified = nowISO();
+      saveLocal(next);
+      return next;
+    });
+    setTradeTicker(null);
+  }
+
+  // No player picked yet → show home/leaderboard
+  if (!currentPid) {
+    return (
+      <div className="fbc-game">
+        <GameHeader title="FUTURE BILLIONAIRES CLUB" onBack={onBack} onSave={onSave} onLoad={onLoad} dataMode={dataMode} lastFetchAt={lastFetchAt} onRefresh={onRefresh} />
+        <div className="fbc-g-body">
+          <PlayerSelect
+            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+            lastFetchAt={lastFetchAt} dataMode={dataMode}
+            liveCount={liveCount} liveTotal={liveTotal}
+            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fbc-game">
+      <GameHeader
+        title={`${player.emoji} ${player.name}`}
+        onBack={() => setCurrentPid(null)}
+        onSave={onSave}
+        onLoad={onLoad}
+        dataMode={dataMode}
+        lastFetchAt={lastFetchAt}
+        onRefresh={onRefresh}
+      />
+      <div className="fbc-g-body">
+        <div className="fbc-g-tabs">
+          {[
+            ['home','🏆 Home'],
+            ['trade','💸 Trade'],
+            ['portfolio','📊 Portfolio'],
+            ['history','📜 History'],
+          ].map(([id, label]) => (
+            <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
+          ))}
+        </div>
+
+        {tab === 'home' && (
+          <PlayerSelect
+            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+            lastFetchAt={lastFetchAt} dataMode={dataMode}
+            liveCount={liveCount} liveTotal={liveTotal}
+            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+          />
+        )}
+        {tab === 'trade' && (
+          <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
+        )}
+        {tab === 'portfolio' && (
+          <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
+        )}
+        {tab === 'history' && (
+          <HistoryView trades={state.trades} currentPid={currentPid} />
+        )}
+      </div>
+
+      {tradeTicker && (
+        <TradeSheet
+          ticker={tradeTicker}
+          action={tradeAction}
+          prices={prices}
+          player={player}
+          onConfirm={executeTrade}
+          onClose={() => setTradeTicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Error boundary — surfaces render-time crashes instead of a blank page ---------- */
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, info: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    this.setState({ error, info });
+    console.error('[FBC ErrorBoundary]', error, info);
+    if (typeof window !== 'undefined') window.__FBC_LAST_ERROR__ = { error, info, ts: Date.now() };
+  }
+  render() {
+    if (this.state.error) {
+      return React.createElement('div', {
+        style: { padding: '24px', fontFamily: 'ui-sans-serif, system-ui', maxWidth: 720, margin: '40px auto' }
+      },
+        React.createElement('h2', { style: { color: '#dc2626' } }, '⚠ App crashed'),
+        React.createElement('p', { style: { color: '#444', fontSize: 14 } }, 'A render-time error stopped the app. Details below — if you reload and it still fails, share this with Otto.'),
+        React.createElement('pre', {
+          style: { background: '#fff5f5', padding: 12, borderRadius: 8, fontSize: 12, overflow: 'auto', whiteSpace: 'pre-wrap' }
+        }, String(this.state.error?.stack || this.state.error)),
+        React.createElement('button', {
+          onClick: () => { localStorage.removeItem(LS_KEY); location.reload(); },
+          style: { padding: '10px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }
+        }, 'Clear save & reload')
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ---------- Root App ----------
+ * v1.4 redesign:
+ *   - No automatic price simulator
+ *   - No automatic live-price interval
+ *   - Prices + historical bars persist to localStorage between sessions
+ *   - Manual REFRESH button is the only trigger for new data
+ *   - On first ever load (no cached prices), one auto-fetch kicks off so the
+ *     user has something to look at; after that everything is manual.
+ * ---------------------------------------------------------------------- */
+function App() {
+  const [route, setRoute] = useState('dashboard');
+  const [state, setState] = useState(() => loadLocal() || SEED);
+
+  // Restore prices from cache, falling back to seeded buy-price baselines.
+  const [prices, setPrices] = useState(() => {
+    const cached = loadPricesLocal();
+    if (cached?.prices) return cached.prices;
+    return applySeedToPrices(initPrices(), state);
+  });
+  const [lastFetchAt, setLastFetchAt] = useState(() => loadPricesLocal()?.fetchedAt || null);
+  const [liveCount, setLiveCount] = useState(0);
+  const [liveTotal, setLiveTotal] = useState(0);
+  const [dataMode, setDataMode] = useState(() => loadPricesLocal() ? 'live' : 'sim');
+  const [fetchInFlight, setFetchInFlight] = useState(false);
+  const [historicalBars, setHistoricalBars] = useState(() => loadHistLocal()?.bars || null);
+  const [recentlyChanged, setRecentlyChanged] = useState({});
+  const fileInputRef = useRef(null);
+
+  const history = useMemo(() => {
+    try {
+      return buildPortfolioHistory(state, historicalBars || {}, prices);
+    } catch (e) {
+      console.error('[FBC history] buildPortfolioHistory threw:', e);
+      return { dates: [], series: {}, error: e.message };
+    }
+  }, [historicalBars, state, prices]);
+
+  // Auto-save game state on every change
+  useEffect(() => { saveLocal(state); }, [state]);
+
+  // Expose for DevTools inspection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__FBC_PRICES__ = prices;
+      window.__FBC_STATE__ = state;
+      window.__FBC_HISTORY__ = history;
+    }
+  }, [prices, state, history]);
+
+  // The unified refresh: fetches live prices AND historical bars, persists both.
+  async function handleRefreshNow() {
+    if (fetchInFlight) return;
+    setFetchInFlight(true);
+    try {
+      const universeYahoo = Object.values(YAHOO_SYMBOLS);
+      const fxSyms = ['GBPUSD=X','AUDUSD=X','CADUSD=X','EURUSD=X','PLNUSD=X'];
+      const allHistSyms = [...new Set([...universeYahoo, ...fxSyms])];
+
+      // Run live + historical fetches in parallel
+      const [liveResult, histBars] = await Promise.all([
+        fetchAllLivePrices(),
+        fetchHistoricalBars(allHistSyms),
+      ]);
+
+      const now = Date.now();
+      let newPrices = null;
+
+      if (liveResult.ok) {
+        setLastFetchAt(now);
+        setLiveCount(liveResult.count);
+        setLiveTotal(liveResult.total);
+        setDataMode('live');
+
+        setPrices(prev => {
+          const next = { ...prev };
+          const changed = {};
+          for (const [tk, p] of Object.entries(liveResult.prices)) {
+            if (!next[tk]) continue;
+            const oldCur = next[tk].cur || 0;
+            const dir = p.cur > oldCur ? 1 : (p.cur < oldCur ? -1 : 0);
+            next[tk] = {
+              ...next[tk],
+              cur: p.cur, dayOpen: p.dayOpen,
+              prevTickAt: now, liveAt: now, lastTickDir: dir,
+            };
+            if (dir !== 0) changed[tk] = dir;
+          }
+          newPrices = next;
+          savePricesLocal(next, now);
+          setRecentlyChanged(changed);
+          setTimeout(() => setRecentlyChanged({}), 1500);
+          return next;
+        });
+
+        const got = Object.keys(liveResult.prices);
+        console.log(`[FBC live] ${liveResult.count}/${liveResult.total} tickers updated.`);
+        const missing = Object.keys(YAHOO_SYMBOLS).filter(t => !got.includes(t));
+        if (missing.length) console.log(`[FBC live] MISSING (${missing.length}):`, missing.join(', '));
+        if (typeof window !== 'undefined') window.__FBC_LAST_FETCH__ = { at: now, ...liveResult };
+      } else {
+        console.warn('[FBC live] all proxies failed');
+      }
+
+      const histGot = Object.keys(histBars).length;
+      console.log(`[FBC history] ${histGot}/${allHistSyms.length} symbols got historical bars`);
+      if (histGot > 0) {
+        setHistoricalBars(histBars);
+        saveHistLocal(histBars, now);
+      }
+    } catch (e) {
+      console.warn('[FBC refresh] failed:', e);
+    } finally {
+      setFetchInFlight(false);
+    }
+  }
+
+  // First-load auto-fetch ONCE if we have nothing cached.
+  useEffect(() => {
+    const cachedPrices = loadPricesLocal();
+    const cachedHist   = loadHistLocal();
+    if (!cachedPrices || !cachedHist) {
+      handleRefreshNow();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleSave() {
+    exportToFile(state);
+  }
+  function handleLoadClick() {
+    fileInputRef.current?.click();
+  }
+  async function handleFileChosen(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const loaded = await importFromFile(f);
+      setState(loaded);
+      saveLocal(loaded);
+      alert('Game loaded.');
+    } catch (err) {
+      alert('Could not load: ' + err.message);
+    }
+    e.target.value = '';
+  }
+  function handleReset() {
+    if (confirm('Reset back to the starting Q2 2026 portfolio? Auto-save your file first if you want to keep current state.')) {
+      setState(SEED);
+      saveLocal(SEED);
+    }
+  }
+
+  return (
+    <div>
+      <input ref={fileInputRef} type="file" accept="application/json" style={{display:'none'}} onChange={handleFileChosen} />
+      {route === 'dashboard' && (
+        <Dashboard
+          prices={prices}
+          recentlyChanged={recentlyChanged}
+          onPlay={() => setRoute('game')}
+          dataMode={dataMode}
+          lastFetchAt={lastFetchAt}
+          liveCount={liveCount}
+          liveTotal={liveTotal}
+          onRefresh={handleRefreshNow}
+          fetchInFlight={fetchInFlight}
+        />
+      )}
+      {route === 'game' && (
+        <Game
+          state={state}
+          setState={setState}
+          prices={prices}
+          dataMode={dataMode}
+          lastFetchAt={lastFetchAt}
+          liveCount={liveCount}
+          liveTotal={liveTotal}
+          onBack={() => setRoute('dashboard')}
+          onSave={handleSave}
+          onLoad={handleLoadClick}
+          onRefresh={handleRefreshNow}
+          fetchInFlight={fetchInFlight}
+          history={history}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary><App /></ErrorBoundary>
+);
+</script>
+</body>
+</html>

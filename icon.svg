@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#05070d"/>
+  <text x="256" y="220" font-family="ui-monospace, 'JetBrains Mono', monospace" font-size="160" font-weight="800" text-anchor="middle" fill="#c9a659">FBC</text>
+  <text x="256" y="340" font-family="ui-monospace, 'JetBrains Mono', monospace" font-size="44" font-weight="700" text-anchor="middle" fill="#5aa9ff" letter-spacing="6">FUTURE</text>
+  <text x="256" y="400" font-family="ui-monospace, 'JetBrains Mono', monospace" font-size="44" font-weight="700" text-anchor="middle" fill="#5aa9ff" letter-spacing="6">BILLIONAIRES</text>
+</svg>

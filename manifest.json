@@ -1,0 +1,19 @@
+{
+  "name": "Future Billionaires Club",
+  "short_name": "FBC",
+  "description": "Family paper-portfolio game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05070d",
+  "theme_color": "#c9a659",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
