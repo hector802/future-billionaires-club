@@ -546,37 +546,19 @@ html, body {
   margin: 0 auto;
 }
 
-/* Shell wrapping the game body and the two educational rails. On phones
- * and tablets the shell is a single column: body first, then both rails
- * stacked below so the content is reachable by scrolling. At >= 1100px
- * the right rail moves alongside the body; at >= 1400px both rails sit
- * either side of the body. */
-.fbc-g-shell {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  margin: 0 auto;
-}
-.fbc-g-rail {
-  display: flex;
-  flex-direction: column;
+/* Learn tab — grid of educational cards (compounding, legends, concepts,
+ * history, market snapshots). The card styling below is shared with the
+ * earlier side-rail surface (now retired); the cat-* classes set a
+ * coloured left edge per category. */
+.fbc-learn-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
-  padding: 8px 12px 16px;
-  align-content: start;
 }
-.fbc-g-rail-left::before,
-.fbc-g-rail-right::before {
-  content: 'MARKETS · LEGENDS · CONCEPTS · HISTORY';
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  color: var(--term-amber);
-  font-weight: 700;
-  padding: 6px 2px 8px;
-  border-bottom: 1px solid var(--term-border);
-  margin-bottom: 4px;
+@media (min-width: 600px) {
+  .fbc-learn-grid { grid-template-columns: 1fr 1fr; }
 }
-.fbc-g-rail-right::before { content: 'MORE · LEGENDS · CONCEPTS · HISTORY'; }
+
 .fbc-g-rail-card {
   background: var(--term-panel);
   border: 1px solid var(--term-border);
@@ -623,31 +605,6 @@ html, body {
   letter-spacing: 0.01em;
 }
 
-/* One rail alongside the body at >= 1100px. Both rails at >= 1400px. */
-@media (min-width: 1100px) {
-  .fbc-g-shell {
-    display: grid;
-    grid-template-columns: minmax(0, 720px) minmax(240px, 320px);
-    column-gap: 16px;
-    max-width: 1100px;
-    padding: 0 12px;
-  }
-  .fbc-g-shell > .fbc-g-body { grid-column: 1; max-width: none; padding-left: 0; padding-right: 0; }
-  .fbc-g-rail-right { grid-column: 2; }
-  .fbc-g-rail-left  { grid-column: 1; padding-top: 16px; }
-  .fbc-g-rail-left::before,
-  .fbc-g-rail-right::before { display: none; }
-}
-@media (min-width: 1400px) {
-  .fbc-g-shell {
-    grid-template-columns: minmax(240px, 320px) minmax(0, 720px) minmax(240px, 320px);
-    column-gap: 20px;
-    max-width: 1500px;
-  }
-  .fbc-g-shell > .fbc-g-body { grid-column: 2; }
-  .fbc-g-rail-left  { grid-column: 1; padding-top: 0; }
-  .fbc-g-rail-right { grid-column: 3; }
-}
 
 .fbc-g-card {
   background: var(--term-panel);

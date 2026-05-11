@@ -2038,34 +2038,46 @@ function HistoryView({ trades, currentPid }) {
   );
 }
 
-/* ---------- Side rail (educational + market info) ---------- */
-function SideRail({ cards, side }) {
+/* ---------- Learn tab — categorised browser over SIDE_RAIL_CARDS ---------- */
+function LearnView() {
+  const [cat, setCat] = useState('ALL');
+  const cats = useMemo(() => {
+    const seen = new Set();
+    for (const c of SIDE_RAIL_CARDS) seen.add(c.cat);
+    return ['ALL', ...Array.from(seen)];
+  }, []);
+  const cards = useMemo(() => {
+    return cat === 'ALL' ? SIDE_RAIL_CARDS : SIDE_RAIL_CARDS.filter(c => c.cat === cat);
+  }, [cat]);
   return (
-    <aside className={`fbc-g-rail fbc-g-rail-${side}`}>
-      {cards.map(c => (
-        <div key={c.id} className={`fbc-g-rail-card cat-${c.cat.toLowerCase()}`}>
-          <div className="fbc-g-rail-cat">{c.cat}</div>
-          <div className="fbc-g-rail-title">{c.title}</div>
-          {c.fact && <div className="fbc-g-rail-fact">{c.fact}</div>}
-          <div className="fbc-g-rail-body">{c.body}</div>
+    <>
+      <div className="fbc-g-card">
+        <h2 className="fbc-g-h2">📚 Learn — markets, legends, concepts, history</h2>
+        <div style={{fontSize:11,color:'var(--term-dim)',marginBottom:10,letterSpacing:'0.05em',lineHeight:1.5}}>
+          Compounding examples (£100 in Amazon 1997 → £270,000), investor records (Buffett, Munger, Lynch, Templeton, Baring), the basic concepts (share, market cap, dividend, P/E, diversify), and the manias the market keeps repeating. Pick a category to filter.
         </div>
-      ))}
-    </aside>
+        <div className="fbc-g-bucket-tabs">
+          {cats.map(c => (
+            <button key={c} className={`fbc-g-bucket ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)}>{c}</button>
+          ))}
+        </div>
+      </div>
+      <div className="fbc-learn-grid">
+        {cards.map(c => (
+          <div key={c.id} className={`fbc-g-rail-card cat-${c.cat.toLowerCase()}`}>
+            <div className="fbc-g-rail-cat">{c.cat}</div>
+            <div className="fbc-g-rail-title">{c.title}</div>
+            {c.fact && <div className="fbc-g-rail-fact">{c.fact}</div>}
+            <div className="fbc-g-rail-body">{c.body}</div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
 /* ---------- Game container ---------- */
 function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight, history }) {
-  /* Pick a fresh side-rail set on each Game mount. Stable across renders
-   * within a session; fresh on next page load. Eight cards per side, drawn
-   * without replacement from SIDE_RAIL_CARDS. */
-  const railCards = useMemo(() => {
-    const shuffled = [...SIDE_RAIL_CARDS].sort(() => Math.random() - 0.5);
-    return {
-      left:  shuffled.slice(0, 8),
-      right: shuffled.slice(8, 16),
-    };
-  }, []);
 
   const [currentPid, setCurrentPid] = useState(null);
   const [tab, setTab] = useState('home');     // home | trade | portfolio | history
@@ -2153,17 +2165,13 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
     return (
       <div className="fbc-game">
         <GameHeader title="FUTURE BILLIONAIRES CLUB" onBack={onBack} onSave={onSave} onLoad={onLoad} dataMode={dataMode} lastFetchAt={lastFetchAt} onRefresh={onRefresh} />
-        <div className="fbc-g-shell">
-          <SideRail side="left"  cards={railCards.left} />
-          <div className="fbc-g-body">
-            <PlayerSelect
-              state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-              lastFetchAt={lastFetchAt} dataMode={dataMode}
-              liveCount={liveCount} liveTotal={liveTotal}
-              onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-            />
-          </div>
-          <SideRail side="right" cards={railCards.right} />
+        <div className="fbc-g-body">
+          <PlayerSelect
+            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+            lastFetchAt={lastFetchAt} dataMode={dataMode}
+            liveCount={liveCount} liveTotal={liveTotal}
+            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+          />
         </div>
       </div>
     );
@@ -2180,39 +2188,39 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
         lastFetchAt={lastFetchAt}
         onRefresh={onRefresh}
       />
-      <div className="fbc-g-shell">
-        <SideRail side="left"  cards={railCards.left} />
-        <div className="fbc-g-body">
-          <div className="fbc-g-tabs">
-            {[
-              ['home','🏆 Home'],
-              ['trade','💸 Trade'],
-              ['portfolio','📊 Portfolio'],
-              ['history','📜 History'],
-            ].map(([id, label]) => (
-              <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
-            ))}
-          </div>
-
-          {tab === 'home' && (
-            <PlayerSelect
-              state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-              lastFetchAt={lastFetchAt} dataMode={dataMode}
-              liveCount={liveCount} liveTotal={liveTotal}
-              onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-            />
-          )}
-          {tab === 'trade' && (
-            <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
-          )}
-          {tab === 'portfolio' && (
-            <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
-          )}
-          {tab === 'history' && (
-            <HistoryView trades={state.trades} currentPid={currentPid} />
-          )}
+      <div className="fbc-g-body">
+        <div className="fbc-g-tabs">
+          {[
+            ['home','🏆 Home'],
+            ['trade','💸 Trade'],
+            ['portfolio','📊 Portfolio'],
+            ['history','📜 History'],
+            ['learn','📚 Learn'],
+          ].map(([id, label]) => (
+            <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
+          ))}
         </div>
-        <SideRail side="right" cards={railCards.right} />
+
+        {tab === 'home' && (
+          <PlayerSelect
+            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+            lastFetchAt={lastFetchAt} dataMode={dataMode}
+            liveCount={liveCount} liveTotal={liveTotal}
+            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+          />
+        )}
+        {tab === 'trade' && (
+          <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
+        )}
+        {tab === 'portfolio' && (
+          <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
+        )}
+        {tab === 'history' && (
+          <HistoryView trades={state.trades} currentPid={currentPid} />
+        )}
+        {tab === 'learn' && (
+          <LearnView />
+        )}
       </div>
 
       {tradeTicker && (
