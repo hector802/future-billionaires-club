@@ -310,6 +310,56 @@ const BLURBS = {
   FNV:  'Franco-Nevada. Same idea as Wheaton — a "royalty" company on gold and oil.',
 };
 
+/* ---------------- Side-rail content ----------------
+ * Boxes that flank the game on wide screens. Investing-history facts,
+ * compounding examples, plain explainers of the basic concepts, and a
+ * few cycle-and-mania reminders. Plain language; British spelling; no
+ * superlatives, no marketing register. The rails pick a random subset
+ * on each render so a long session sees variety.
+ * ----------------------------------------- */
+const SIDE_RAIL_CARDS = [
+  // ---- Compounding (£100 → £X over time) ----
+  { id:'c-amazon', cat:'COMPOUND', title:'AMAZON, 1997', fact:'£100 → roughly £270,000', body:'Bought at the IPO in May 1997 and held through every drawdown, the position is now worth around 2,700 times the cost. Most investors did not hold; that is the harder lesson.' },
+  { id:'c-apple-2001', cat:'COMPOUND', title:'APPLE, 2001', fact:'£100 → roughly £80,000', body:'A pre-iPod Apple traded under three dollars on a split-adjusted basis. Twenty-five years later it is the most valuable company in the world.' },
+  { id:'c-berkshire', cat:'COMPOUND', title:'BERKSHIRE, 1965', fact:'£100 → roughly £3,500,000', body:'Buying one share of Berkshire Hathaway in 1965, when Buffett took control, and never selling. About 35,000 times your money. This is what 20% a year for sixty years looks like.' },
+  { id:'c-sp500', cat:'COMPOUND', title:'S&P 500, 1980', fact:'£100 → roughly £8,000', body:'The American market index, dividends reinvested. Around 11% per year for forty-five years. A doubling roughly every seven years.' },
+  { id:'c-gold', cat:'COMPOUND', title:'GOLD, 1971', fact:'£100 → roughly £8,500', body:'When the United States closed the gold window in August 1971, gold was fixed at $35 per ounce. It has compounded close to 8% per year in dollars since. The number is mostly the dollar weakening.' },
+  { id:'c-bitcoin', cat:'COMPOUND', title:'BITCOIN, 2013', fact:'£100 → roughly £770,000', body:'Buying at $13 a coin in early 2013 and not selling. The volatility was extreme along the way: 80% drawdowns happened more than once.' },
+  { id:'c-vodafone', cat:'COMPOUND', title:'VODAFONE, 1999', fact:'£100 → roughly £35', body:'Not every story compounds upward. Vodafone was the largest company on the FTSE in 1999. A quarter of a century of dividends only partly recovered the price decline.' },
+  { id:'c-rule72', cat:'CONCEPT', title:'THE RULE OF 72', fact:'Years to double = 72 / annual %', body:'At 6% your money doubles in twelve years. At 12% it doubles in six. At 24% it doubles every three. Compounding is not steady — it is exponential.' },
+
+  // ---- Legend cards (Buffett, Munger, Lynch, Baring) ----
+  { id:'l-buffett-net', cat:'LEGEND', title:'BUFFETT, NET WORTH', fact:'About $150 billion, almost entirely Berkshire shares', body:'He still owns roughly 15% of Berkshire Hathaway. He takes a salary of $100,000 a year. He has pledged 99% of his wealth to philanthropy and has already given away tens of billions.' },
+  { id:'l-buffett-young', cat:'LEGEND', title:'BUFFETT, AGE 11', fact:'First share at 11. First tax return at 13.', body:'Three shares of Cities Service Preferred at $38, sold at $40. The stock then ran to $200. He kept the lesson and stopped selling early.' },
+  { id:'l-buffett-method', cat:'LEGEND', title:'BUFFETT — THE METHOD', body:'Buy good businesses run by honest, capable managers, hold them for as long as the business stays good. Avoid the businesses you do not understand. Be greedy when others are fearful, fearful when others are greedy. The framework is simple. The discipline to apply it for sixty years is not.' },
+  { id:'l-buffett-record', cat:'LEGEND', title:'BUFFETT — THE RECORD', fact:'About 20% per year, 1965 to 2025', body:'Berkshire\'s book value has compounded around 20% a year for sixty years. The S&P 500 has done about 10% over the same span. The gap is most of the difference between an ordinary fortune and one of the largest in history.' },
+  { id:'l-munger', cat:'LEGEND', title:'CHARLIE MUNGER', fact:'Buffett\'s partner. Lived to 99.', body:'Munger\'s edge was breadth — engineering, biology, psychology, history — applied to investing. He called it a "lattice of mental models". Munger pushed Buffett away from cheap-and-mediocre toward great-at-fair-prices.' },
+  { id:'l-lynch', cat:'LEGEND', title:'PETER LYNCH, MAGELLAN', fact:'29% per year, 1977 to 1990', body:'Thirteen years running Fidelity Magellan, more than doubling the market. His rule: buy what you understand. He spotted Hanes from his wife\'s tights and Dunkin\' Donuts from a coffee on the way to work.' },
+  { id:'l-templeton', cat:'LEGEND', title:'JOHN TEMPLETON', fact:'Bought 100 shares of every NYSE stock under $1 in 1939', body:'A few months after Hitler invaded Poland, Templeton borrowed $10,000 and bought everything trading under a pound. Most went to zero. The basket quadrupled in four years. He spent the next sixty years investing in countries other people would not.' },
+  { id:'l-baring', cat:'LEGEND', title:'JULIAN BARING', body:'A British gold investor who treated mining as a hard-money cycle business, not a momentum trade. He read commodity cycles in decades, not quarters, and wrote letters that read like dry conversations between adults.' },
+
+  // ---- Concept cards ----
+  { id:'cc-share', cat:'CONCEPT', title:'WHAT IS A SHARE', body:'A share is a small piece of a company. If you own one Apple share out of sixteen billion, you own one sixteen-billionth of Apple. Owners get a vote on big decisions and a slice of the profits.' },
+  { id:'cc-mcap', cat:'CONCEPT', title:'WHAT IS MARKET CAP', fact:'Price per share × number of shares', body:'The total price tag the market puts on a company today. Apple at three trillion dollars means buying every share would cost three trillion. That is more than every UK listed company put together.' },
+  { id:'cc-dividend', cat:'CONCEPT', title:'WHAT IS A DIVIDEND', body:'A dividend is cash the company sends to its owners, usually four times a year. Mature companies — Coca-Cola, Shell, Unilever — pay them. Younger ones — Tesla, Amazon — keep the cash to grow.' },
+  { id:'cc-pe', cat:'CONCEPT', title:'WHAT IS A P/E', fact:'Price ÷ earnings per share', body:'How many years of profit you are paying for at today\'s price. A P/E of 15 means fifteen years of profit. High P/Es say the market expects rapid growth, low P/Es say it does not.' },
+  { id:'cc-diversify', cat:'CONCEPT', title:'WHY DIVERSIFY', body:'You do not know which company will win, so you own several. Owning twenty shares across different industries protects you when one of them blows up. Owning two hundred dilutes your best ideas. Most professional portfolios sit between these two.' },
+  { id:'cc-volatility', cat:'CONCEPT', title:'PRICE IS NOT VALUE', body:'Prices move every minute, often on news that has nothing to do with the underlying business. The value of the business changes far more slowly. The investor\'s job is to know which is which.' },
+  { id:'cc-compound-rate', cat:'CONCEPT', title:'WHY ONE PERCENT MATTERS', body:'£10,000 at 7% per year for forty years becomes £150,000. At 8% it becomes £217,000. One extra percentage point a year, compounded, is worth more than the original capital.' },
+
+  // ---- History (manias and crashes) ----
+  { id:'h-tulips', cat:'HISTORY', title:'TULIP MANIA, 1637', body:'Single tulip bulbs in Holland traded for the price of a townhouse, then fell 99% in three months. Charles Mackay catalogued the episode in 1841 in *Extraordinary Popular Delusions*. Manias since have followed the same outline.' },
+  { id:'h-southsea', cat:'HISTORY', title:'SOUTH SEA BUBBLE, 1720', body:'A British company with monopoly trade rights to South America rose tenfold in a year, then crashed. Isaac Newton sold early at a profit, bought back at the top, and lost the modern equivalent of three million pounds. He said afterwards: "I can calculate the motions of heavenly bodies, but not the madness of people."' },
+  { id:'h-dotcom', cat:'HISTORY', title:'DOT-COM, 2000', body:'The Nasdaq tripled between 1998 and March 2000, then fell 78% over the next thirty months. Pets.com, Webvan and Boo.com went to zero. Amazon survived a 95% drawdown — the same Amazon mentioned in the £100 card.' },
+  { id:'h-gfc', cat:'HISTORY', title:'FINANCIAL CRISIS, 2008', body:'The S&P 500 halved between October 2007 and March 2009. Anyone who sold at the bottom locked in the loss. Anyone who held to 2014 was back to even, and well ahead by 2020.' },
+  { id:'h-cycle', cat:'HISTORY', title:'CYCLES, NOT TRENDS', body:'Resource markets run in twenty-year cycles, not quarterly trends. Gold spent 1980 to 2001 falling, then rose seven-fold. Oil did the same in different decades. The investor who confuses a long bear for a permanent decline misses the next bull entirely.' },
+
+  // ---- Markets-now (snapshot facts) ----
+  { id:'m-largest', cat:'MARKET', title:'LARGEST BY MARKET CAP', body:'Apple, Microsoft, NVIDIA, Alphabet, Amazon. Five US technology firms. Each one is larger than the entire stock market of any single European country.' },
+  { id:'m-gold-pound', cat:'MARKET', title:'GOLD VS THE POUND', body:'In 1971 a British pound bought 0.3 ounces of gold. Today it buys around 0.0003 ounces. Most of that is the pound losing value, not gold finding any.' },
+  { id:'m-inflation', cat:'MARKET', title:'INFLATION QUIETLY EATS', body:'A 3% inflation rate halves the purchasing power of cash in 24 years. Holding cash is not safety. It is a slow, certain loss in real terms.' },
+];
+
 const ASSETS = Object.fromEntries(UNIVERSE.map(a => [a.t, a]));
 
 /* ---------------- Seeded state from the seed spreadsheet ----------------
@@ -481,6 +531,203 @@ function importFromFile(file) {
     reader.onerror = () => reject(reader.error);
     reader.readAsText(file);
   });
+}
+
+/* ---------------- Registry + credentials ----------------
+ * The app holds a registry of games keyed by an opaque id.
+ * Each game carries a system-generated email and a hashed password.
+ * The plain password is shown to the user once at creation and never stored.
+ * The legacy single-game key fbc_state_v1 is migrated into a default game
+ * named "Family" on first run and then left intact as a backup.
+ * ----------------------------------------- */
+const REGISTRY_LS_KEY      = 'fbc_registry_v1';
+const ACTIVE_GAME_LS_KEY   = 'fbc_active_game_v1';
+const PENDING_REVEAL_KEY   = 'fbc_pending_reveal_v1';
+
+const CRED_ADJ = ['quiet','bright','sharp','calm','swift','clever','steady','bold','keen','plain','northern','rolling','frosted','copper','amber','silent','crisp','rapid'];
+const CRED_ANIMAL = ['fox','otter','heron','badger','wren','hare','sparrow','marten','curlew','linnet','vole','grouse','kestrel','plover','dipper'];
+const CRED_WORD = ['lemon','steel','ember','quartz','meadow','river','ledge','tide','frost','willow','copper','amber','beacon','pebble','spruce','garnet','cedar','flint','marble','bramble','linden','heather','hazel','rowan'];
+
+function pickFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function generateEmail() {
+  return `${pickFrom(CRED_ADJ)}${pickFrom(CRED_ANIMAL)}${1000 + Math.floor(Math.random() * 9000)}@fbc.local`;
+}
+function generatePassword() {
+  return `${pickFrom(CRED_WORD)}-${pickFrom(CRED_WORD)}-${pickFrom(CRED_WORD)}-${10 + Math.floor(Math.random() * 90)}`;
+}
+async function hashPassword(pw) {
+  if (!crypto || !crypto.subtle) return 'plain:' + pw; /* extreme fallback for very old browsers */
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function loadRegistry() {
+  try {
+    const raw = localStorage.getItem(REGISTRY_LS_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw);
+    if (r && r.games && typeof r.games === 'object') return r;
+  } catch {}
+  return null;
+}
+function saveRegistry(reg) {
+  try { localStorage.setItem(REGISTRY_LS_KEY, JSON.stringify(reg)); } catch {}
+}
+function loadActiveGameId() {
+  try { return localStorage.getItem(ACTIVE_GAME_LS_KEY); } catch { return null; }
+}
+function saveActiveGameId(id) {
+  try { localStorage.setItem(ACTIVE_GAME_LS_KEY, id); } catch {}
+}
+function clearActiveGameId() {
+  try { localStorage.removeItem(ACTIVE_GAME_LS_KEY); } catch {}
+}
+function loadPendingReveal() {
+  try {
+    const raw = localStorage.getItem(PENDING_REVEAL_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function savePendingReveal(rev) {
+  try { localStorage.setItem(PENDING_REVEAL_KEY, JSON.stringify(rev)); } catch {}
+}
+function clearPendingReveal() {
+  try { localStorage.removeItem(PENDING_REVEAL_KEY); } catch {}
+}
+
+function buildEmptyGameState() {
+  /* New game: same player slots and game metadata as SEED, fresh cash, no holdings, no trades. */
+  const players = {};
+  for (const [pid, p] of Object.entries(SEED.players)) {
+    players[pid] = { ...p, cash: STARTING_CASH, holdings: {} };
+  }
+  return {
+    schema_version: SCHEMA_VERSION,
+    game: { ...SEED.game },
+    players,
+    order: [...SEED.order],
+    trades: [],
+    created_at: nowISO(),
+    last_modified: nowISO(),
+  };
+}
+
+async function ensureRegistryInitialised() {
+  const existing = loadRegistry();
+  if (existing) return existing;
+  const reg = { schema_version: 1, games: {}, created_at: nowISO() };
+  /* One-time migration of the legacy fbc_state_v1 key. */
+  const legacy = loadLocal();
+  if (legacy && legacy.players && legacy.order) {
+    const id = uid('g');
+    const email = generateEmail();
+    const password = generatePassword();
+    const password_hash = await hashPassword(password);
+    reg.games[id] = {
+      id, email, password_hash,
+      name: 'Family',
+      created_at: nowISO(),
+      last_played: nowISO(),
+      state: legacy,
+    };
+    savePendingReveal({ game_id: id, name: 'Family', email, password, reason: 'migration' });
+  }
+  saveRegistry(reg);
+  return reg;
+}
+
+async function createGameInRegistry(name) {
+  const reg = loadRegistry() || { schema_version: 1, games: {}, created_at: nowISO() };
+  const id = uid('g');
+  const email = generateEmail();
+  const password = generatePassword();
+  const password_hash = await hashPassword(password);
+  const state = buildEmptyGameState();
+  reg.games[id] = {
+    id, email, password_hash,
+    name: name || 'New Game',
+    created_at: nowISO(),
+    last_played: nowISO(),
+    state,
+  };
+  saveRegistry(reg);
+  return { id, email, password, state };
+}
+
+async function findGameByCredentials(email, password) {
+  const reg = loadRegistry();
+  if (!reg) return null;
+  const target_hash = await hashPassword(password);
+  const norm = (email || '').trim().toLowerCase();
+  for (const g of Object.values(reg.games)) {
+    if ((g.email || '').toLowerCase() === norm && g.password_hash === target_hash) return g;
+  }
+  return null;
+}
+
+function writeStateToActiveGame(gameId, state) {
+  const reg = loadRegistry();
+  if (!reg || !reg.games[gameId]) return;
+  reg.games[gameId].state = state;
+  reg.games[gameId].last_played = nowISO();
+  saveRegistry(reg);
+}
+
+/* Set custom credentials on an existing game, or build a Family game from
+ * the legacy fbc_state_v1 with those credentials, or stand up a fresh empty
+ * Family game with those credentials. Returns the resolved game record. */
+async function setCredentialsForGame(targetEmail, targetPassword, targetGameName) {
+  const password_hash = await hashPassword(targetPassword);
+  let reg = loadRegistry();
+  if (!reg || !reg.games) reg = { schema_version: 1, games: {}, created_at: nowISO() };
+  const wantedName = (targetGameName || 'Family').trim() || 'Family';
+  let game = Object.values(reg.games).find(g => g.name === wantedName);
+  if (!game) {
+    const legacy = loadLocal();
+    const seedState = (legacy && legacy.players && legacy.order) ? legacy : buildEmptyGameState();
+    const id = uid('g');
+    game = {
+      id,
+      email: targetEmail,
+      password_hash,
+      name: wantedName,
+      created_at: nowISO(),
+      last_played: nowISO(),
+      state: seedState,
+    };
+    reg.games[id] = game;
+  } else {
+    game.email = targetEmail;
+    game.password_hash = password_hash;
+    game.last_played = nowISO();
+  }
+  saveRegistry(reg);
+  clearPendingReveal();
+  return game;
+}
+
+function downloadCredentialsFile(name, email, password) {
+  const slug = (email.split('@')[0] || 'game').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const txt = [
+    'Future Billionaires Club — game credentials',
+    '',
+    `Game     ${name}`,
+    `Email    ${email}`,
+    `Password ${password}`,
+    `Saved    ${nowISO()}`,
+    '',
+    'These credentials are the only way back into this game. Keep them somewhere safe.',
+    ''
+  ].join('\n');
+  const blob = new Blob([txt], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fbc-game-${slug || 'new'}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /* ---------------- Price Simulator ----------------
@@ -1003,7 +1250,7 @@ function timeSinceShort(ts) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function Dashboard({ prices, recentlyChanged, onPlay, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight }) {
+function Dashboard({ prices, recentlyChanged, onNewGame, onLogin, onManage, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight, migrationBanner, onDismissBanner, onCopyBanner, onDownloadBanner }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -1078,9 +1325,30 @@ function Dashboard({ prices, recentlyChanged, onPlay, dataMode, lastFetchAt, liv
               borderRadius: 2,
             }}
           >{fetchInFlight ? '↻ FETCHING…' : '↻ REFRESH PRICES'}</button>
-          <button className="fbc-d-play" onClick={onPlay}>▶ PLAY</button>
+          <div className="fbc-d-cta-group">
+            <button className="fbc-d-cta primary" onClick={onNewGame}>+ NEW GAME</button>
+            <button className="fbc-d-cta secondary" onClick={onLogin}>▶ LOG INTO EXISTING</button>
+            <button className="fbc-d-cta ghost" onClick={onManage} title="Set or reset credentials manually">⚙ SET CREDENTIALS</button>
+          </div>
         </div>
       </div>
+      {migrationBanner ? (
+        <div className="fbc-d-migration">
+          <div className="fbc-d-migration-head">EXISTING GAME MIGRATED · CREDENTIALS GENERATED</div>
+          <div className="fbc-d-migration-body">
+            Your existing game has been moved into the new credential-based system as <span className="hl">{migrationBanner.name}</span>. Write these credentials down. They are the only way back into this game.
+          </div>
+          <div className="fbc-d-migration-creds">
+            <div><span className="lbl">EMAIL</span><span className="val">{migrationBanner.email}</span></div>
+            <div><span className="lbl">PASSWORD</span><span className="val">{migrationBanner.password}</span></div>
+          </div>
+          <div className="fbc-d-migration-actions">
+            <button className="fbc-d-cta secondary" onClick={onCopyBanner}>COPY CREDENTIALS</button>
+            <button className="fbc-d-cta secondary" onClick={onDownloadBanner}>DOWNLOAD CREDENTIALS</button>
+            <button className="fbc-d-cta ghost" onClick={onDismissBanner}>I HAVE SAVED THEM</button>
+          </div>
+        </div>
+      ) : null}
       <div style={{
         background: 'var(--term-panel)', borderBottom: '1px solid var(--term-border)',
         padding: '6px 16px', fontSize: 11, color: 'var(--term-dim)',
@@ -1179,26 +1447,23 @@ function Dashboard({ prices, recentlyChanged, onPlay, dataMode, lastFetchAt, liv
 
 /* ---------- Game header ---------- */
 function GameHeader({ title, onBack, onSave, onLoad, dataMode, lastFetchAt, onRefresh }) {
-  const dot = dataMode === 'live' ? '🟢' : dataMode === 'stale' ? '🟡' : '⚪';
+  const dotClass = dataMode === 'live' ? 'live' : dataMode === 'stale' ? 'stale' : 'sim';
   const label = dataMode === 'live' ? 'LIVE'
               : dataMode === 'stale' ? 'STALE'
               : 'SIM';
   const ago = lastFetchAt ? Math.round((Date.now() - lastFetchAt) / 1000) : null;
   return (
     <div className="fbc-g-header">
-      <button className="fbc-g-back" onClick={onBack}>← Dashboard</button>
+      <button className="fbc-g-back" onClick={onBack}>← DASHBOARD</button>
       <span className="fbc-g-title">{title}</span>
       <div className="fbc-g-actions">
         <button
+          className="fbc-g-statusbtn"
           onClick={onRefresh}
           title={ago != null ? `Last update ${ago}s ago — tap to refresh` : 'Tap to refresh prices'}
-          style={{
-            background:'#f6f1e3', border:'none', borderRadius:10, padding:'6px 10px',
-            fontWeight:700, fontSize:11, cursor:'pointer', letterSpacing:'0.06em'
-          }}
-        >{dot} {label}</button>
-        <button className="fbc-g-iconbtn" onClick={onSave} title="Download save file">💾</button>
-        <button className="fbc-g-iconbtn" onClick={onLoad} title="Load save file">📂</button>
+        ><span className={`fbc-g-dot ${dotClass}`}>●</span> {label}</button>
+        <button className="fbc-g-iconbtn" onClick={onSave} title="Download save file">SAVE</button>
+        <button className="fbc-g-iconbtn" onClick={onLoad} title="Load save file">LOAD</button>
       </div>
     </div>
   );
@@ -1540,8 +1805,14 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
   const ownedValue = ownedUnits * px;
 
   const [amount, setAmount] = useState('');
+  const [sellAll, setSellAll] = useState(false);
   const [error, setError] = useState('');
   const amountNum = parseFloat(amount) || 0;
+
+  function setAmountManual(s) {
+    setAmount(s);
+    setSellAll(false);
+  }
 
   function quickSet(v) {
     if (action === 'buy') {
@@ -1553,15 +1824,25 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
         Math.floor(cap),
       ];
       setAmount(String(presets[v]));
+      setSellAll(false);
     } else {
       // sell: amount in USD
-      const presets = [
-        Math.floor(ownedValue * 0.25),
-        Math.floor(ownedValue * 0.5),
-        Math.floor(ownedValue * 0.75),
-        Math.floor(ownedValue),
-      ];
-      setAmount(String(presets[v]));
+      if (v === 3) {
+        // ALL: prefill the exact owned value (no flooring) and flag a full close-out.
+        // The flag is the source of truth on confirm; units are taken straight from
+        // the holding rather than round-tripped through dollars, so float artefacts
+        // can't leave a residual line on the portfolio.
+        setAmount(ownedValue.toFixed(2));
+        setSellAll(true);
+      } else {
+        const presets = [
+          Math.floor(ownedValue * 0.25),
+          Math.floor(ownedValue * 0.5),
+          Math.floor(ownedValue * 0.75),
+        ];
+        setAmount(String(presets[v]));
+        setSellAll(false);
+      }
     }
   }
 
@@ -1574,8 +1855,17 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
       onConfirm({ action:'buy', ticker, units, price: px, value: amountNum });
     } else {
       if (amountNum > ownedValue + 0.01) { setError(`You only own ${fmtUSD(ownedValue, 2)} of ${ticker}.`); return; }
-      const units = amountNum / px;
-      onConfirm({ action:'sell', ticker, units, price: px, value: amountNum });
+      // Treat as a full close-out if ALL was clicked, or if the user typed within
+      // a cent of the displayed holding value. Either way, sell the exact owned
+      // units and let executeTrade delete the line.
+      const closeAll = sellAll || amountNum >= ownedValue - 0.01;
+      if (closeAll) {
+        const trueValue = ownedUnits * px;
+        onConfirm({ action:'sell', ticker, units: ownedUnits, price: px, value: trueValue, closeAll: true });
+      } else {
+        const units = amountNum / px;
+        onConfirm({ action:'sell', ticker, units, price: px, value: amountNum });
+      }
     }
   }
 
@@ -1607,7 +1897,7 @@ function TradeSheet({ ticker, action, prices, player, onConfirm, onClose }) {
           inputMode="decimal"
           placeholder="$"
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => setAmountManual(e.target.value)}
         />
         <div className="fbc-g-quick-amts">
           {[0,1,2,3].map(i => <button key={i} onClick={() => quickSet(i)}>
@@ -1748,8 +2038,35 @@ function HistoryView({ trades, currentPid }) {
   );
 }
 
+/* ---------- Side rail (educational + market info) ---------- */
+function SideRail({ cards, side }) {
+  return (
+    <aside className={`fbc-g-rail fbc-g-rail-${side}`}>
+      {cards.map(c => (
+        <div key={c.id} className={`fbc-g-rail-card cat-${c.cat.toLowerCase()}`}>
+          <div className="fbc-g-rail-cat">{c.cat}</div>
+          <div className="fbc-g-rail-title">{c.title}</div>
+          {c.fact && <div className="fbc-g-rail-fact">{c.fact}</div>}
+          <div className="fbc-g-rail-body">{c.body}</div>
+        </div>
+      ))}
+    </aside>
+  );
+}
+
 /* ---------- Game container ---------- */
 function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastFetchAt, liveCount, liveTotal, onRefresh, fetchInFlight, history }) {
+  /* Pick a fresh side-rail set on each Game mount. Stable across renders
+   * within a session; fresh on next page load. Eight cards per side, drawn
+   * without replacement from SIDE_RAIL_CARDS. */
+  const railCards = useMemo(() => {
+    const shuffled = [...SIDE_RAIL_CARDS].sort(() => Math.random() - 0.5);
+    return {
+      left:  shuffled.slice(0, 8),
+      right: shuffled.slice(8, 16),
+    };
+  }, []);
+
   const [currentPid, setCurrentPid] = useState(null);
   const [tab, setTab] = useState('home');     // home | trade | portfolio | history
   const [tradeTicker, setTradeTicker] = useState(null);
@@ -1776,7 +2093,6 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
       next.players[pid].name = trimmed;
       next.players[pid].short = trimmed.slice(0, 8);
       next.last_modified = nowISO();
-      saveLocal(next);
       return next;
     });
   }
@@ -1786,7 +2102,7 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
     setTradeAction(action);
   }
 
-  function executeTrade({ action, ticker, units, price, value }) {
+  function executeTrade({ action, ticker, units, price, value, closeAll }) {
     setState(prev => {
       const next = JSON.parse(JSON.stringify(prev));
       const p = next.players[currentPid];
@@ -1802,12 +2118,23 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
         // sell
         const h = p.holdings[ticker];
         if (!h) return prev;
-        const sellRatio = units / h.units;
-        const costRemoved = h.cost * sellRatio;
-        h.units -= units;
-        h.cost  -= costRemoved;
-        p.cash  += value;
-        if (h.units < 1e-9) delete p.holdings[ticker];
+        // Treat as a full close-out if the modal flagged it, or if the requested
+        // units cover the held quantity within float tolerance. Zero everything
+        // and remove the line so no fractional residual can survive in the
+        // portfolio.
+        if (closeAll || units >= h.units - 1e-9) {
+          p.cash += value;
+          delete p.holdings[ticker];
+        } else {
+          const sellRatio = units / h.units;
+          const costRemoved = h.cost * sellRatio;
+          h.units -= units;
+          h.cost  -= costRemoved;
+          p.cash  += value;
+          // Belt-and-braces: if the partial path leaves a sub-cent dust position
+          // for any other reason, sweep it.
+          if (h.units < 1e-9 || h.units * price < 0.005) delete p.holdings[ticker];
+        }
       }
       next.trades.push({
         id: uid('t'),
@@ -1816,7 +2143,6 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
         action, ticker, units, price, value,
       });
       next.last_modified = nowISO();
-      saveLocal(next);
       return next;
     });
     setTradeTicker(null);
@@ -1827,13 +2153,17 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
     return (
       <div className="fbc-game">
         <GameHeader title="FUTURE BILLIONAIRES CLUB" onBack={onBack} onSave={onSave} onLoad={onLoad} dataMode={dataMode} lastFetchAt={lastFetchAt} onRefresh={onRefresh} />
-        <div className="fbc-g-body">
-          <PlayerSelect
-            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-            lastFetchAt={lastFetchAt} dataMode={dataMode}
-            liveCount={liveCount} liveTotal={liveTotal}
-            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-          />
+        <div className="fbc-g-shell">
+          <SideRail side="left"  cards={railCards.left} />
+          <div className="fbc-g-body">
+            <PlayerSelect
+              state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+              lastFetchAt={lastFetchAt} dataMode={dataMode}
+              liveCount={liveCount} liveTotal={liveTotal}
+              onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+            />
+          </div>
+          <SideRail side="right" cards={railCards.right} />
         </div>
       </div>
     );
@@ -1850,35 +2180,39 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
         lastFetchAt={lastFetchAt}
         onRefresh={onRefresh}
       />
-      <div className="fbc-g-body">
-        <div className="fbc-g-tabs">
-          {[
-            ['home','🏆 Home'],
-            ['trade','💸 Trade'],
-            ['portfolio','📊 Portfolio'],
-            ['history','📜 History'],
-          ].map(([id, label]) => (
-            <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
-          ))}
-        </div>
+      <div className="fbc-g-shell">
+        <SideRail side="left"  cards={railCards.left} />
+        <div className="fbc-g-body">
+          <div className="fbc-g-tabs">
+            {[
+              ['home','🏆 Home'],
+              ['trade','💸 Trade'],
+              ['portfolio','📊 Portfolio'],
+              ['history','📜 History'],
+            ].map(([id, label]) => (
+              <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
+            ))}
+          </div>
 
-        {tab === 'home' && (
-          <PlayerSelect
-            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-            lastFetchAt={lastFetchAt} dataMode={dataMode}
-            liveCount={liveCount} liveTotal={liveTotal}
-            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-          />
-        )}
-        {tab === 'trade' && (
-          <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
-        )}
-        {tab === 'portfolio' && (
-          <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
-        )}
-        {tab === 'history' && (
-          <HistoryView trades={state.trades} currentPid={currentPid} />
-        )}
+          {tab === 'home' && (
+            <PlayerSelect
+              state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+              lastFetchAt={lastFetchAt} dataMode={dataMode}
+              liveCount={liveCount} liveTotal={liveTotal}
+              onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+            />
+          )}
+          {tab === 'trade' && (
+            <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
+          )}
+          {tab === 'portfolio' && (
+            <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
+          )}
+          {tab === 'history' && (
+            <HistoryView trades={state.trades} currentPid={currentPid} />
+          )}
+        </div>
+        <SideRail side="right" cards={railCards.right} />
       </div>
 
       {tradeTicker && (
@@ -1933,15 +2267,191 @@ class ErrorBoundary extends React.Component {
  *   - On first ever load (no cached prices), one auto-fetch kicks off so the
  *     user has something to look at; after that everything is manual.
  * ---------------------------------------------------------------------- */
+/* ---------- Credential entry modals ---------- */
+function CredentialsRevealModal({ name, email, password, onClose }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    const txt = `Future Billionaires Club\nGame     ${name}\nEmail    ${email}\nPassword ${password}\n`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
+      ta.remove();
+    }
+  }
+  function handleDownload() { downloadCredentialsFile(name, email, password); }
+  return (
+    <div className="fbc-modal-overlay">
+      <div className="fbc-modal">
+        <div className="fbc-modal-head">YOUR GAME IS READY</div>
+        <div className="fbc-modal-body">
+          <p className="fbc-modal-warn">Email and password below. Write them down. They are the only way back into this game.</p>
+          <div className="fbc-cred-block">
+            <div className="fbc-cred-row"><span className="lbl">GAME</span><span className="val">{name}</span></div>
+            <div className="fbc-cred-row"><span className="lbl">EMAIL</span><span className="val">{email}</span></div>
+            <div className="fbc-cred-row"><span className="lbl">PASSWORD</span><span className="val">{password}</span></div>
+          </div>
+          <div className="fbc-modal-actions">
+            <button className="fbc-d-cta secondary" onClick={handleCopy}>{copied ? 'COPIED' : 'COPY CREDENTIALS'}</button>
+            <button className="fbc-d-cta secondary" onClick={handleDownload}>DOWNLOAD CREDENTIALS</button>
+          </div>
+          <button className="fbc-d-cta primary fbc-modal-confirm" onClick={onClose}>I HAVE SAVED THEM · CONTINUE</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewGameModal({ onCreate, onClose, working }) {
+  const [name, setName] = useState('');
+  function submit(e) {
+    e.preventDefault();
+    const n = (name || '').trim();
+    if (!n) return;
+    onCreate(n);
+  }
+  return (
+    <div className="fbc-modal-overlay" onClick={onClose}>
+      <form className="fbc-modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <div className="fbc-modal-head">NEW GAME</div>
+        <div className="fbc-modal-body">
+          <label className="fbc-modal-label">GAME NAME</label>
+          <input
+            className="fbc-modal-input"
+            type="text"
+            placeholder="e.g. Family · Christmas · Class 4B"
+            autoFocus
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={40}
+          />
+          <p className="fbc-modal-hint">A name for your records. The game itself is identified by an email and password generated on the next screen.</p>
+          <div className="fbc-modal-actions">
+            <button type="button" className="fbc-d-cta ghost" onClick={onClose}>CANCEL</button>
+            <button type="submit" className="fbc-d-cta primary" disabled={!name.trim() || working}>{working ? 'CREATING…' : 'CREATE GAME'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SetCredentialsModal({ onSave, onClose, working }) {
+  const [name, setName] = useState('Family');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [done, setDone] = useState(null);
+  function submit(e) {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    onSave(email.trim(), password.trim(), name.trim() || 'Family').then(g => {
+      setDone({ email: g.email, name: g.name });
+    }).catch(err => {
+      alert('Could not set credentials: ' + (err && err.message ? err.message : String(err)));
+    });
+  }
+  if (done) {
+    return (
+      <div className="fbc-modal-overlay" onClick={onClose}>
+        <div className="fbc-modal" onClick={e => e.stopPropagation()}>
+          <div className="fbc-modal-head">CREDENTIALS SET</div>
+          <div className="fbc-modal-body">
+            <p className="fbc-modal-warn">Use these credentials at <span style={{color:'var(--term-text)'}}>Log Into Existing</span>. The game name is <span style={{color:'var(--term-amber)'}}>{done.name}</span>.</p>
+            <div className="fbc-cred-block">
+              <div className="fbc-cred-row"><span className="lbl">EMAIL</span><span className="val">{done.email}</span></div>
+              <div className="fbc-cred-row"><span className="lbl">PASSWORD</span><span className="val">(as you typed)</span></div>
+            </div>
+            <button className="fbc-d-cta primary fbc-modal-confirm" onClick={onClose}>CLOSE</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="fbc-modal-overlay" onClick={onClose}>
+      <form className="fbc-modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <div className="fbc-modal-head">SET CREDENTIALS MANUALLY</div>
+        <div className="fbc-modal-body">
+          <p className="fbc-modal-warn">Use this when you have lost the auto-generated credentials, or want to pick your own. If a game with the name below already exists, its credentials are replaced. Otherwise a game is created — from your legacy state if there is any, otherwise empty.</p>
+          <label className="fbc-modal-label">GAME NAME</label>
+          <input className="fbc-modal-input" type="text" value={name} onChange={e => setName(e.target.value)} maxLength={40} />
+          <label className="fbc-modal-label">EMAIL</label>
+          <input className="fbc-modal-input" type="text" autoComplete="off" autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          <label className="fbc-modal-label">PASSWORD</label>
+          <input className="fbc-modal-input" type="text" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} placeholder="any string you will remember" />
+          <p className="fbc-modal-hint">Existing portfolios in this browser are preserved. The legacy <span style={{color:'var(--term-text)'}}>fbc_state_v1</span> backup is left untouched.</p>
+          <div className="fbc-modal-actions">
+            <button type="button" className="fbc-d-cta ghost" onClick={onClose}>CANCEL</button>
+            <button type="submit" className="fbc-d-cta primary" disabled={!email.trim() || !password.trim() || working}>{working ? 'SAVING…' : 'SAVE CREDENTIALS'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function LoginModal({ onSubmit, onClose, error, working }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  function submit(e) {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    onSubmit(email.trim(), password.trim());
+  }
+  return (
+    <div className="fbc-modal-overlay" onClick={onClose}>
+      <form className="fbc-modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <div className="fbc-modal-head">LOG INTO EXISTING</div>
+        <div className="fbc-modal-body">
+          <label className="fbc-modal-label">EMAIL</label>
+          <input className="fbc-modal-input" type="text" autoComplete="off" autoFocus value={email} onChange={e => setEmail(e.target.value)} />
+          <label className="fbc-modal-label">PASSWORD</label>
+          <input className="fbc-modal-input" type="text" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} />
+          <p className="fbc-modal-hint">There is no password recovery. If you have lost your credentials, the game cannot be reopened.</p>
+          {error ? <div className="fbc-modal-error">{error}</div> : null}
+          <div className="fbc-modal-actions">
+            <button type="button" className="fbc-d-cta ghost" onClick={onClose}>CANCEL</button>
+            <button type="submit" className="fbc-d-cta primary" disabled={!email.trim() || !password.trim() || working}>{working ? 'CHECKING…' : 'OPEN GAME'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function App() {
-  const [route, setRoute] = useState('dashboard');
-  const [state, setState] = useState(() => loadLocal() || SEED);
+  const [registry, setRegistry] = useState(null);
+  const [migrationBanner, setMigrationBanner] = useState(null); /* {name, email, password} from pending reveal */
+  const [activeGameId, setActiveGameId] = useState(null);
+  const [modal, setModal] = useState(null); /* 'new' | 'login' | 'reveal' | null */
+  const [reveal, setReveal] = useState(null); /* {name, email, password} after creating a new game */
+  const [loginError, setLoginError] = useState(null);
+  const [working, setWorking] = useState(false);
+  const [route, setRoute] = useState('dashboard'); /* 'dashboard' | 'game' */
+  const [state, setState] = useState(SEED);
+
+  /* Initialise registry on mount and surface any pending migration banner. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const reg = await ensureRegistryInitialised();
+      if (cancelled) return;
+      setRegistry(reg);
+      const reveal = loadPendingReveal();
+      if (reveal && reveal.reason === 'migration') {
+        setMigrationBanner({ name: reveal.name, email: reveal.email, password: reveal.password });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Restore prices from cache, falling back to seeded buy-price baselines.
   const [prices, setPrices] = useState(() => {
     const cached = loadPricesLocal();
     if (cached?.prices) return cached.prices;
-    return applySeedToPrices(initPrices(), state);
+    return applySeedToPrices(initPrices(), SEED);
   });
   const [lastFetchAt, setLastFetchAt] = useState(() => loadPricesLocal()?.fetchedAt || null);
   const [liveCount, setLiveCount] = useState(0);
@@ -1961,8 +2471,10 @@ function App() {
     }
   }, [historicalBars, state, prices]);
 
-  // Auto-save game state on every change
-  useEffect(() => { saveLocal(state); }, [state]);
+  /* Persist active game state into the registry whenever it changes. */
+  useEffect(() => {
+    if (activeGameId) writeStateToActiveGame(activeGameId, state);
+  }, [state, activeGameId]);
 
   // Expose for DevTools inspection
   useEffect(() => {
@@ -1970,8 +2482,10 @@ function App() {
       window.__FBC_PRICES__ = prices;
       window.__FBC_STATE__ = state;
       window.__FBC_HISTORY__ = history;
+      window.__FBC_REGISTRY__ = registry;
+      window.__FBC_ACTIVE_ID__ = activeGameId;
     }
-  }, [prices, state, history]);
+  }, [prices, state, history, registry, activeGameId]);
 
   // The unified refresh: fetches live prices AND historical bars, persists both.
   async function handleRefreshNow() {
@@ -2062,7 +2576,7 @@ function App() {
     try {
       const loaded = await importFromFile(f);
       setState(loaded);
-      saveLocal(loaded);
+      if (activeGameId) writeStateToActiveGame(activeGameId, loaded);
       alert('Game loaded.');
     } catch (err) {
       alert('Could not load: ' + err.message);
@@ -2070,9 +2584,79 @@ function App() {
     e.target.value = '';
   }
   function handleReset() {
-    if (confirm('Reset back to the starting Q2 2026 portfolio? Auto-save your file first if you want to keep current state.')) {
+    if (confirm('Reset back to the starting Q2 2026 portfolio? Save your file first if you want to keep current state.')) {
       setState(SEED);
-      saveLocal(SEED);
+      if (activeGameId) writeStateToActiveGame(activeGameId, SEED);
+    }
+  }
+
+  /* ---- credential flows ---- */
+  async function handleNewGameCreate(name) {
+    setWorking(true);
+    try {
+      const made = await createGameInRegistry(name);
+      setRegistry(loadRegistry());
+      setReveal({ name, email: made.email, password: made.password, gameId: made.id });
+      setActiveGameId(made.id);
+      setState(made.state);
+      setModal('reveal');
+    } finally {
+      setWorking(false);
+    }
+  }
+  async function handleLoginSubmit(email, password) {
+    setWorking(true);
+    setLoginError(null);
+    try {
+      const found = await findGameByCredentials(email, password);
+      if (!found) {
+        setLoginError('No game found for those credentials.');
+        return;
+      }
+      setActiveGameId(found.id);
+      saveActiveGameId(found.id);
+      setState(found.state);
+      setModal(null);
+      setRoute('game');
+    } finally {
+      setWorking(false);
+    }
+  }
+  function handleRevealClose() {
+    if (reveal && reveal.gameId) {
+      saveActiveGameId(reveal.gameId);
+      setRoute('game');
+    }
+    setModal(null);
+    setReveal(null);
+  }
+  function handleBackToDashboard() {
+    setActiveGameId(null);
+    clearActiveGameId();
+    setRoute('dashboard');
+  }
+  function handleDismissBanner() {
+    clearPendingReveal();
+    setMigrationBanner(null);
+  }
+  function handleCopyBanner() {
+    if (!migrationBanner) return;
+    const txt = `Future Billionaires Club\nGame     ${migrationBanner.name}\nEmail    ${migrationBanner.email}\nPassword ${migrationBanner.password}\n`;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt);
+  }
+  function handleDownloadBanner() {
+    if (!migrationBanner) return;
+    downloadCredentialsFile(migrationBanner.name, migrationBanner.email, migrationBanner.password);
+  }
+  async function handleSetCredentials(email, password, gameName) {
+    setWorking(true);
+    try {
+      const game = await setCredentialsForGame(email, password, gameName);
+      setRegistry(loadRegistry());
+      setMigrationBanner(null);
+      return game;
+    } finally {
+      setWorking(false);
     }
   }
 
@@ -2083,13 +2667,19 @@ function App() {
         <Dashboard
           prices={prices}
           recentlyChanged={recentlyChanged}
-          onPlay={() => setRoute('game')}
+          onNewGame={() => { setLoginError(null); setModal('new'); }}
+          onLogin={() => { setLoginError(null); setModal('login'); }}
+          onManage={() => setModal('manage')}
           dataMode={dataMode}
           lastFetchAt={lastFetchAt}
           liveCount={liveCount}
           liveTotal={liveTotal}
           onRefresh={handleRefreshNow}
           fetchInFlight={fetchInFlight}
+          migrationBanner={migrationBanner}
+          onDismissBanner={handleDismissBanner}
+          onCopyBanner={handleCopyBanner}
+          onDownloadBanner={handleDownloadBanner}
         />
       )}
       {route === 'game' && (
@@ -2101,12 +2691,42 @@ function App() {
           lastFetchAt={lastFetchAt}
           liveCount={liveCount}
           liveTotal={liveTotal}
-          onBack={() => setRoute('dashboard')}
+          onBack={handleBackToDashboard}
           onSave={handleSave}
           onLoad={handleLoadClick}
           onRefresh={handleRefreshNow}
           fetchInFlight={fetchInFlight}
           history={history}
+        />
+      )}
+      {modal === 'new' && (
+        <NewGameModal
+          onClose={() => setModal(null)}
+          onCreate={handleNewGameCreate}
+          working={working}
+        />
+      )}
+      {modal === 'login' && (
+        <LoginModal
+          onClose={() => { setModal(null); setLoginError(null); }}
+          onSubmit={handleLoginSubmit}
+          error={loginError}
+          working={working}
+        />
+      )}
+      {modal === 'reveal' && reveal && (
+        <CredentialsRevealModal
+          name={reveal.name}
+          email={reveal.email}
+          password={reveal.password}
+          onClose={handleRevealClose}
+        />
+      )}
+      {modal === 'manage' && (
+        <SetCredentialsModal
+          onClose={() => setModal(null)}
+          onSave={handleSetCredentials}
+          working={working}
         />
       )}
     </div>
