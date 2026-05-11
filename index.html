@@ -1446,7 +1446,7 @@ function Dashboard({ prices, recentlyChanged, onNewGame, onLogin, onManage, data
 }
 
 /* ---------- Game header ---------- */
-function GameHeader({ title, onBack, onSave, onLoad, dataMode, lastFetchAt, onRefresh }) {
+function GameHeader({ title, onBack, onSave, onLoad, dataMode, lastFetchAt, onRefresh, onLearn, learnOpen }) {
   const dotClass = dataMode === 'live' ? 'live' : dataMode === 'stale' ? 'stale' : 'sim';
   const label = dataMode === 'live' ? 'LIVE'
               : dataMode === 'stale' ? 'STALE'
@@ -1454,7 +1454,14 @@ function GameHeader({ title, onBack, onSave, onLoad, dataMode, lastFetchAt, onRe
   const ago = lastFetchAt ? Math.round((Date.now() - lastFetchAt) / 1000) : null;
   return (
     <div className="fbc-g-header">
-      <button className="fbc-g-back" onClick={onBack}>← DASHBOARD</button>
+      <div className="fbc-g-header-left">
+        <button className="fbc-g-back" onClick={onBack}>← DASHBOARD</button>
+        {onLearn && (
+          <button className={`fbc-g-back ${learnOpen ? 'active' : ''}`} onClick={onLearn} title="Markets, legends, concepts, history">
+            {learnOpen ? '← BACK' : '📚 LEARN'}
+          </button>
+        )}
+      </div>
       <span className="fbc-g-title">{title}</span>
       <div className="fbc-g-actions">
         <button
@@ -2083,6 +2090,8 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
   const [tab, setTab] = useState('home');     // home | trade | portfolio | history
   const [tradeTicker, setTradeTicker] = useState(null);
   const [tradeAction, setTradeAction] = useState('buy');
+  const [learnOpen, setLearnOpen] = useState(false);
+  const toggleLearn = () => setLearnOpen(v => !v);
 
   const player = currentPid ? state.players[currentPid] : null;
 
@@ -2164,14 +2173,18 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
   if (!currentPid) {
     return (
       <div className="fbc-game">
-        <GameHeader title="FUTURE BILLIONAIRES CLUB" onBack={onBack} onSave={onSave} onLoad={onLoad} dataMode={dataMode} lastFetchAt={lastFetchAt} onRefresh={onRefresh} />
+        <GameHeader title="FUTURE BILLIONAIRES CLUB" onBack={onBack} onSave={onSave} onLoad={onLoad} dataMode={dataMode} lastFetchAt={lastFetchAt} onRefresh={onRefresh} onLearn={toggleLearn} learnOpen={learnOpen} />
         <div className="fbc-g-body">
-          <PlayerSelect
-            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-            lastFetchAt={lastFetchAt} dataMode={dataMode}
-            liveCount={liveCount} liveTotal={liveTotal}
-            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-          />
+          {learnOpen ? (
+            <LearnView />
+          ) : (
+            <PlayerSelect
+              state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+              lastFetchAt={lastFetchAt} dataMode={dataMode}
+              liveCount={liveCount} liveTotal={liveTotal}
+              onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+            />
+          )}
         </div>
       </div>
     );
@@ -2187,39 +2200,43 @@ function Game({ state, setState, prices, onBack, onSave, onLoad, dataMode, lastF
         dataMode={dataMode}
         lastFetchAt={lastFetchAt}
         onRefresh={onRefresh}
+        onLearn={toggleLearn}
+        learnOpen={learnOpen}
       />
       <div className="fbc-g-body">
-        <div className="fbc-g-tabs">
-          {[
-            ['home','🏆 Home'],
-            ['trade','💸 Trade'],
-            ['portfolio','📊 Portfolio'],
-            ['history','📜 History'],
-            ['learn','📚 Learn'],
-          ].map(([id, label]) => (
-            <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
-          ))}
-        </div>
-
-        {tab === 'home' && (
-          <PlayerSelect
-            state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
-            lastFetchAt={lastFetchAt} dataMode={dataMode}
-            liveCount={liveCount} liveTotal={liveTotal}
-            onRefresh={onRefresh} fetchInFlight={fetchInFlight}
-          />
-        )}
-        {tab === 'trade' && (
-          <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
-        )}
-        {tab === 'portfolio' && (
-          <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
-        )}
-        {tab === 'history' && (
-          <HistoryView trades={state.trades} currentPid={currentPid} />
-        )}
-        {tab === 'learn' && (
+        {learnOpen ? (
           <LearnView />
+        ) : (
+          <>
+            <div className="fbc-g-tabs">
+              {[
+                ['home','🏆 Home'],
+                ['trade','💸 Trade'],
+                ['portfolio','📊 Portfolio'],
+                ['history','📜 History'],
+              ].map(([id, label]) => (
+                <button key={id} className={`fbc-g-tab ${tab===id?'active':''}`} onClick={() => setTab(id)}>{label}</button>
+              ))}
+            </div>
+
+            {tab === 'home' && (
+              <PlayerSelect
+                state={state} prices={prices} onPickPlayer={pickPlayer} onRenamePlayer={renamePlayer} history={history}
+                lastFetchAt={lastFetchAt} dataMode={dataMode}
+                liveCount={liveCount} liveTotal={liveTotal}
+                onRefresh={onRefresh} fetchInFlight={fetchInFlight}
+              />
+            )}
+            {tab === 'trade' && (
+              <AssetBrowser prices={prices} onPick={(t) => openTrade(t, 'buy')} />
+            )}
+            {tab === 'portfolio' && (
+              <PortfolioView player={player} prices={prices} onSell={(t) => openTrade(t, 'sell')} />
+            )}
+            {tab === 'history' && (
+              <HistoryView trades={state.trades} currentPid={currentPid} />
+            )}
+          </>
         )}
       </div>
 

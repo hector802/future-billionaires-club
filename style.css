@@ -476,6 +476,11 @@ html, body {
   z-index: 10;
   gap: 8px;
 }
+.fbc-g-header-left {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 .fbc-g-back {
   background: transparent;
   border: 1px solid var(--term-border);
@@ -487,8 +492,14 @@ html, body {
   padding: 7px 12px;
   cursor: pointer;
   border-radius: 2px;
+  white-space: nowrap;
 }
 .fbc-g-back:hover { color: var(--term-amber); border-color: var(--term-amber); }
+.fbc-g-back.active {
+  color: var(--term-amber);
+  border-color: var(--term-amber);
+  background: rgba(245, 185, 33, 0.08);
+}
 .fbc-g-title {
   font-family: var(--term-mono);
   font-weight: 700;
